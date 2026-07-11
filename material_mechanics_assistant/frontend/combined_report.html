@@ -43,7 +43,6 @@
                     <div>
                         <div class="experiment-code">AUTO REPORT</div>
                         <h2>选择实验并填写数据</h2>
-                        <p>固定文字来自已校核的手写报告，只有原始数据、计算表和数值结论会变化。</p>
                     </div>
                     <div id="serverState" class="server-state">连接中</div>
                 </div>
@@ -56,23 +55,26 @@
                 <section class="report-step">
                     <div class="step-heading"><span>2</span><div><h3>报告信息</h3><p>用于替换报告页首信息</p></div></div>
                     <div class="info-grid">
-                        <label>课程教师<input id="teacher" placeholder="例如：指导教师"></label>
-                        <label>学号<input id="studentId" placeholder="请输入学号"></label>
-                        <label>班级<input id="className" placeholder="请输入班级"></label>
-                        <label>姓名<input id="studentName" placeholder="请输入姓名"></label>
-                        <label>同组者<input id="partners" placeholder="请输入同组者"></label>
-                        <label>日期<input id="date" type="date"></label>
+                        <label>课程教师<input id="teacher"></label>
+                        <label>学号<input id="studentId"></label>
+                        <label>班级<input id="className"></label>
+                        <label>姓名<input id="studentName"></label>
+                        <label>同组者<input id="partners"></label>
+                        <label>日期<input id="date" inputmode="numeric"></label>
                     </div>
                 </section>
 
                 <section class="report-step raw-data-step">
                     <div class="step-heading">
                         <span>3</span>
-                        <div><h3 id="rawDataTitle">原始数据</h3><p id="rawDataHint">数列使用逗号分隔，矩阵每行代表一个加载级</p></div>
+                        <div><h3 id="rawDataTitle">原始数据</h3><p id="rawDataHint">数列与矩阵可在表格中逐项增删，也可通过 CSV 批量编辑</p></div>
                     </div>
                     <div class="input-actions">
                         <button id="loadExampleBtn"><span class="button-icon">↺</span><span>载入报告算例</span></button>
                         <button id="resetCurrentBtn"><span class="button-icon">⌫</span><span>恢复本实验</span></button>
+                        <button id="downloadCsvTemplateBtn"><span class="button-icon">⇩</span><span>下载 CSV 模板</span></button>
+                        <button id="importCsvBtn"><span class="button-icon">⇧</span><span>导入 CSV</span></button>
+                        <input id="csvFileInput" type="file" accept=".csv,text/csv" hidden>
                     </div>
                     <div id="rawInputForm" class="raw-input-form"></div>
                 </section>

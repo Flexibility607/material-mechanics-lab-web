@@ -121,6 +121,12 @@
     font: inherit;
 }
 
+.info-grid input::placeholder,
+.raw-input-form input::placeholder {
+    color: var(--muted);
+    opacity: 0.68;
+}
+
 .info-grid input,
 .raw-input-form input {
     height: 38px;
@@ -134,9 +140,10 @@
 
 .input-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
-    justify-content: flex-end;
-    margin: -42px 0 12px;
+    justify-content: flex-start;
+    margin: 0 0 12px;
 }
 
 .raw-input-form {
@@ -182,6 +189,88 @@
 .field-help {
     color: var(--muted);
     font-size: 0.72rem;
+}
+
+.array-field {
+    display: grid;
+    gap: 7px;
+    min-width: 0;
+}
+
+.array-field-title {
+    color: var(--muted);
+    font-size: 0.82rem;
+}
+
+.array-table-wrap {
+    max-width: 100%;
+    overflow: auto;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: var(--surface);
+}
+
+.array-data-table {
+    width: 100%;
+    min-width: 430px;
+    border-collapse: collapse;
+    font-size: 0.78rem;
+}
+
+.array-data-table th,
+.array-data-table td {
+    padding: 6px;
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    text-align: center;
+    white-space: nowrap;
+}
+
+.array-data-table th {
+    color: var(--muted);
+    background: var(--surface-soft);
+    font-weight: 700;
+}
+
+.array-data-table tr:last-child > * { border-bottom: none; }
+.array-data-table tr > *:last-child { border-right: none; }
+
+.array-data-table input {
+    min-width: 88px;
+    height: 32px;
+    padding: 5px 7px;
+    text-align: center;
+}
+
+.series-table th:first-child { width: 62px; }
+.series-table th:last-child { width: 72px; }
+
+.array-table-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+}
+
+.array-table-actions button,
+.table-delete-button,
+.table-icon-button {
+    min-height: 30px;
+    padding: 5px 9px;
+    border-radius: 7px;
+    font-size: 0.75rem;
+}
+
+.table-delete-button {
+    color: #b42318;
+    border-color: color-mix(in srgb, #b42318 30%, var(--line));
+}
+
+.table-icon-button {
+    min-width: 24px;
+    min-height: 24px;
+    margin-left: 5px;
+    padding: 1px 5px;
+    color: #b42318;
 }
 
 .report-toolbar {

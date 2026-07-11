@@ -13,7 +13,15 @@
     };
 
     const els = {};
-    const storageKey = "material-mechanics:auto-report:v2";
+    const storageKey = "material-mechanics:auto-report:v3";
+    const metadataInputMap = {
+        teacher: "teacher",
+        student_id: "studentId",
+        class: "className",
+        name: "studentName",
+        partner: "partners",
+        date: "date"
+    };
 
     const labels = {
         material: "材料",
@@ -118,7 +126,6 @@
         bindElements();
         bindEvents();
         restoreTheme();
-        setDefaultDate();
         try {
             setServerState("连接中", "busy");
             const response = await fetch("/api/auto-report/catalog");
@@ -142,6 +149,7 @@
         [
             "serverState", "themeToggle", "toast", "calcStatus", "reportExperimentList",
             "rawInputForm", "rawDataTitle", "rawDataHint", "loadExampleBtn", "resetCurrentBtn",
+            "downloadCsvTemplateBtn", "importCsvBtn", "csvFileInput",
             "calculateReportBtn", "downloadMarkdownBtn", "downloadHtmlBtn", "printBtn",
             "reportPreview", "reportMeta", "teacher", "studentId", "className",
             "studentName", "partners", "date", "openaiStatus", "openaiModel",
@@ -153,6 +161,9 @@
         els.themeToggle.addEventListener("click", toggleTheme);
         els.loadExampleBtn.addEventListener("click", loadAllExamples);
         els.resetCurrentBtn.addEventListener("click", resetCurrentExperiment);
+        els.downloadCsvTemplateBtn.addEventListener("click", downloadCsvTemplate);
+        els.importCsvBtn.addEventListener("click", () => els.csvFileInput.click());
+        els.csvFileInput.addEventListener("change", importCsvFile);
         els.calculateReportBtn.addEventListener("click", calculateReport);
         els.downloadMarkdownBtn.addEventListener("click", downloadMarkdown);
         els.downloadHtmlBtn.addEventListener("click", downloadHtml);
@@ -171,12 +182,28 @@
         });
         const ids = state.catalog.experiments.map(exp => exp.id);
         if (!ids.includes(state.selectedId)) state.selectedId = ids[0];
-        const meta = state.catalog.metadata || {};
-        if (!els.teacher.value) els.teacher.value = meta.teacher || "";
-        if (!els.studentId.value) els.studentId.value = meta.student_id || "";
-        if (!els.className.value) els.className.value = meta.class || "";
-        if (!els.studentName.value) els.studentName.value = meta.name || "";
-        if (!els.partners.value) els.partners.value = meta.partner || "";
+        configureMetadataDefaults();
+    }
+
+    function metadataDefaults() {
+        const meta = state.catalog?.metadata || {};
+        return {
+            teacher: meta.teacher || "指导教师",
+            student_id: meta.student_id || "20260000",
+            class: meta.class || "示例班级",
+            name: meta.name || "示例学生",
+            partner: meta.partner || "无",
+            date: meta.date || todayIso()
+        };
+    }
+
+    function configureMetadataDefaults() {
+        const defaults = metadataDefaults();
+        Object.entries(metadataInputMap).forEach(([key, id]) => {
+            const value = defaults[key];
+            els[id].dataset.defaultValue = value;
+            els[id].placeholder = `默认：${value}`;
+        });
     }
 
     function currentExperiment() {
@@ -216,6 +243,9 @@
         els.rawInputForm.querySelectorAll("[data-input-path]").forEach(input => {
             input.addEventListener("input", handleDataInput);
             input.addEventListener("change", handleDataInput);
+        });
+        els.rawInputForm.querySelectorAll("[data-array-action]").forEach(button => {
+            button.addEventListener("click", handleArrayAction);
         });
     }
 
@@ -268,16 +298,7 @@
         const label = fieldLabel(key);
         const helpText = help[key] ? `<span class="field-help">${escapeHtml(help[key])}</span>` : "";
         if (Array.isArray(value)) {
-            const isMatrix = value.length > 0 && Array.isArray(value[0]);
-            const text = isMatrix
-                ? value.map(row => row.join(", ")).join("\n")
-                : value.join(", ");
-            return `
-                <label class="wide-field">${escapeHtml(label)}
-                    <textarea data-input-path="${encodedPath}" data-kind="${isMatrix ? "matrix" : "series"}">${escapeHtml(text)}</textarea>
-                    ${helpText}
-                </label>
-            `;
+            return renderArrayTable(value, path, label, helpText);
         }
         if (typeof value === "boolean") {
             return `
@@ -297,30 +318,126 @@
         `;
     }
 
+    function renderArrayTable(value, path, label, helpText) {
+        const encodedArrayPath = escapeHtml(JSON.stringify(path));
+        const isMatrix = value.length > 0 && Array.isArray(value[0]);
+        if (isMatrix) {
+            const columnCount = Math.max(1, ...value.map(row => row.length));
+            return `
+                <div class="wide-field array-field">
+                    <div class="array-field-title">${escapeHtml(label)}</div>
+                    <div class="array-table-wrap">
+                        <table class="array-data-table">
+                            <thead><tr>
+                                <th>加载级</th>
+                                ${Array.from({ length: columnCount }, (_, column) => `
+                                    <th>第 ${column + 1} 列${columnCount > 1 ? `<button type="button" class="table-icon-button" data-array-action="delete-column" data-array-path="${encodedArrayPath}" data-array-column="${column}" aria-label="删除第 ${column + 1} 列">×</button>` : ""}</th>
+                                `).join("")}
+                                <th>操作</th>
+                            </tr></thead>
+                            <tbody>
+                                ${value.map((row, rowIndex) => `
+                                    <tr>
+                                        <th>${rowIndex + 1}</th>
+                                        ${Array.from({ length: columnCount }, (_, columnIndex) => renderArrayCell(row[columnIndex] ?? 0, [...path, rowIndex, columnIndex], `${label} 第 ${rowIndex + 1} 行第 ${columnIndex + 1} 列`)).join("")}
+                                        <td><button type="button" class="table-delete-button" data-array-action="delete-row" data-array-path="${encodedArrayPath}" data-array-row="${rowIndex}" ${value.length <= 1 ? "disabled" : ""}>删除</button></td>
+                                    </tr>
+                                `).join("")}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="array-table-actions">
+                        <button type="button" data-array-action="add-row" data-array-path="${encodedArrayPath}">＋ 添加一行</button>
+                        <button type="button" data-array-action="add-column" data-array-path="${encodedArrayPath}">＋ 添加一列</button>
+                    </div>
+                    ${helpText}
+                </div>
+            `;
+        }
+        return `
+            <div class="wide-field array-field">
+                <div class="array-field-title">${escapeHtml(label)}</div>
+                <div class="array-table-wrap">
+                    <table class="array-data-table series-table">
+                        <thead><tr><th>序号</th><th>数值</th><th>操作</th></tr></thead>
+                        <tbody>
+                            ${value.map((item, index) => `
+                                <tr>
+                                    <th>${index + 1}</th>
+                                    ${renderArrayCell(item, [...path, index], `${label} 第 ${index + 1} 项`)}
+                                    <td><button type="button" class="table-delete-button" data-array-action="delete-item" data-array-path="${encodedArrayPath}" data-array-row="${index}" ${value.length <= 1 ? "disabled" : ""}>删除</button></td>
+                                </tr>
+                            `).join("")}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="array-table-actions">
+                    <button type="button" data-array-action="add-item" data-array-path="${encodedArrayPath}">＋ 添加数据</button>
+                </div>
+                ${helpText}
+            </div>
+        `;
+    }
+
+    function renderArrayCell(value, path, ariaLabel) {
+        const encodedPath = escapeHtml(JSON.stringify(path));
+        const kind = typeof value === "number" ? "number" : "text";
+        return `<td><input aria-label="${escapeHtml(ariaLabel)}" data-input-path="${encodedPath}" data-kind="${kind}" type="${kind === "number" ? "number" : "text"}" ${kind === "number" ? "step=\"any\"" : ""} value="${escapeHtml(value ?? "")}"></td>`;
+    }
+
     function handleDataInput(event) {
         const input = event.target;
         const path = JSON.parse(input.dataset.inputPath);
         let value;
         if (input.dataset.kind === "boolean") value = input.checked;
         else if (input.dataset.kind === "number") value = input.value === "" ? null : Number(input.value);
-        else if (input.dataset.kind === "series") value = parseSeries(input.value);
-        else if (input.dataset.kind === "matrix") value = input.value.split(/\r?\n/).filter(line => line.trim()).map(parseSeries);
         else value = input.value;
         setPath(state.data[currentExperiment().key], path, value);
         saveState();
     }
 
-    function parseSeries(text) {
-        return text.split(/[,，;；\s]+/).map(item => item.trim()).filter(Boolean).map(item => {
-            const number = Number(item);
-            return Number.isFinite(number) ? number : item;
-        });
+    function handleArrayAction(event) {
+        const button = event.currentTarget;
+        const path = JSON.parse(button.dataset.arrayPath);
+        const target = getPath(state.data[currentExperiment().key], path);
+        const action = button.dataset.arrayAction;
+        if (!Array.isArray(target)) return;
+        if (action === "add-item") target.push(defaultArrayValue(target));
+        if (action === "delete-item" && target.length > 1) target.splice(Number(button.dataset.arrayRow), 1);
+        if (action === "add-row") {
+            const columns = Math.max(1, ...target.map(row => Array.isArray(row) ? row.length : 0));
+            target.push(Array.from({ length: columns }, () => defaultMatrixValue(target)));
+        }
+        if (action === "delete-row" && target.length > 1) target.splice(Number(button.dataset.arrayRow), 1);
+        if (action === "add-column") target.forEach(row => row.push(defaultMatrixValue(target)));
+        if (action === "delete-column" && target[0]?.length > 1) {
+            const column = Number(button.dataset.arrayColumn);
+            target.forEach(row => row.splice(column, 1));
+        }
+        renderCurrentForm();
+        saveState();
+    }
+
+    function defaultArrayValue(array) {
+        const last = array[array.length - 1];
+        if (typeof last === "number") return 0;
+        if (typeof last === "boolean") return false;
+        return "";
+    }
+
+    function defaultMatrixValue(matrix) {
+        const lastRow = matrix[matrix.length - 1] || [];
+        return defaultArrayValue(lastRow);
     }
 
     function setPath(root, path, value) {
         let target = root;
         for (let i = 0; i < path.length - 1; i++) target = target[path[i]];
         target[path[path.length - 1]] = value;
+    }
+
+    function getPath(root, path) {
+        return path.reduce((target, key) => target?.[key], root);
     }
 
     async function calculateReport() {
@@ -556,7 +673,152 @@
         showStatus(`已恢复 ${exp.id} 报告算例。`, "ok");
     }
 
-    function reportInfo() {
+    function downloadCsvTemplate() {
+        const exp = currentExperiment();
+        const rows = [];
+        collectCsvRows(state.data[exp.key], [], rows);
+        const header = ["path", "label", "type", "row", "column", "value"];
+        const csv = [header, ...rows].map(row => row.map(csvCell).join(",")).join("\r\n");
+        downloadText(`${exp.id}_原始数据模板.csv`, `\ufeff${csv}`, "text/csv;charset=utf-8");
+        showStatus(`已生成 ${exp.id} CSV 模板；可在表格软件中修改后重新导入。`, "ok");
+    }
+
+    function collectCsvRows(value, path, rows) {
+        if (Array.isArray(value)) {
+            if (value.length && value.every(item => isPlainObject(item))) {
+                value.forEach((item, index) => collectCsvRows(item, [...path, index], rows));
+                return;
+            }
+            const label = fieldLabel(String(path[path.length - 1] ?? "value"));
+            if (value.length && Array.isArray(value[0])) {
+                value.forEach((row, rowIndex) => row.forEach((item, columnIndex) => {
+                    rows.push([csvPath(path), label, "matrix", rowIndex + 1, columnIndex + 1, item]);
+                }));
+            } else {
+                value.forEach((item, index) => rows.push([csvPath(path), label, "series", index + 1, "", item]));
+            }
+            return;
+        }
+        if (isPlainObject(value)) {
+            Object.entries(value).forEach(([key, item]) => collectCsvRows(item, [...path, key], rows));
+            return;
+        }
+        const label = fieldLabel(String(path[path.length - 1] ?? "value"));
+        rows.push([csvPath(path), label, typeof value, "", "", value]);
+    }
+
+    function csvPath(path) {
+        return path.join(".");
+    }
+
+    function csvCell(value) {
+        return `"${String(value ?? "").replace(/"/g, '""')}"`;
+    }
+
+    async function importCsvFile(event) {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        try {
+            const records = parseCsv(await file.text());
+            applyCsvRecords(records);
+            renderCurrentForm();
+            saveState();
+            showStatus(`已从 ${file.name} 导入原始数据。`, "ok");
+        } catch (error) {
+            showStatus(`CSV 导入失败：${error.message}`, "bad");
+        } finally {
+            event.target.value = "";
+        }
+    }
+
+    function parseCsv(text) {
+        const rows = [];
+        let row = [];
+        let cell = "";
+        let quoted = false;
+        const source = text.replace(/^\ufeff/, "");
+        for (let index = 0; index < source.length; index++) {
+            const char = source[index];
+            if (quoted) {
+                if (char === '"' && source[index + 1] === '"') {
+                    cell += '"';
+                    index++;
+                } else if (char === '"') quoted = false;
+                else cell += char;
+                continue;
+            }
+            if (char === '"') quoted = true;
+            else if (char === ",") {
+                row.push(cell);
+                cell = "";
+            } else if (char === "\n") {
+                row.push(cell.replace(/\r$/, ""));
+                if (row.some(item => item !== "")) rows.push(row);
+                row = [];
+                cell = "";
+            } else cell += char;
+        }
+        row.push(cell.replace(/\r$/, ""));
+        if (row.some(item => item !== "")) rows.push(row);
+        if (quoted) throw new Error("CSV 中存在未闭合的引号");
+        if (rows.length < 2) throw new Error("CSV 没有可导入的数据行");
+        const headers = rows[0].map(item => item.trim().toLowerCase());
+        for (const required of ["path", "type", "value"]) {
+            if (!headers.includes(required)) throw new Error(`缺少 ${required} 列，请使用下载的模板`);
+        }
+        return rows.slice(1).map(values => Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ""])));
+    }
+
+    function applyCsvRecords(records) {
+        const exp = currentExperiment();
+        const data = clone(state.data[exp.key]);
+        const series = new Map();
+        const matrices = new Map();
+        records.forEach(record => {
+            const path = record.path.split(".").filter(Boolean).map(part => /^\d+$/.test(part) ? Number(part) : part);
+            if (!path.length) return;
+            if (record.type === "series") {
+                if (!series.has(record.path)) series.set(record.path, { path, values: [] });
+                series.get(record.path).values.push([Number(record.row), csvValue(record.value, "series")]);
+                return;
+            }
+            if (record.type === "matrix") {
+                if (!matrices.has(record.path)) matrices.set(record.path, { path, values: [] });
+                matrices.get(record.path).values.push([Number(record.row), Number(record.column), csvValue(record.value, "matrix")]);
+                return;
+            }
+            const current = getPath(data, path);
+            setPath(data, path, csvValue(record.value, record.type, current));
+        });
+        series.forEach(group => {
+            const values = group.values
+                .filter(([row]) => Number.isInteger(row) && row > 0)
+                .sort((a, b) => a[0] - b[0])
+                .map(([, value]) => value);
+            if (values.length) setPath(data, group.path, values);
+        });
+        matrices.forEach(group => {
+            const valid = group.values.filter(([row, column]) => Number.isInteger(row) && row > 0 && Number.isInteger(column) && column > 0);
+            if (!valid.length) return;
+            const rowCount = Math.max(...valid.map(([row]) => row));
+            const columnCount = Math.max(...valid.map(([, column]) => column));
+            const matrix = Array.from({ length: rowCount }, () => Array(columnCount).fill(0));
+            valid.forEach(([row, column, value]) => { matrix[row - 1][column - 1] = value; });
+            setPath(data, group.path, matrix);
+        });
+        state.data[exp.key] = data;
+    }
+
+    function csvValue(value, type, current) {
+        if (type === "boolean" || typeof current === "boolean") return /^(true|1|yes|是)$/i.test(String(value).trim());
+        if (type === "number" || type === "series" || type === "matrix" || typeof current === "number") {
+            const number = Number(value);
+            if (Number.isFinite(number)) return number;
+        }
+        return value;
+    }
+
+    function enteredReportInfo() {
         return {
             teacher: els.teacher.value.trim(),
             student_id: els.studentId.value.trim(),
@@ -567,11 +829,17 @@
         };
     }
 
+    function reportInfo() {
+        const entered = enteredReportInfo();
+        const defaults = metadataDefaults();
+        return Object.fromEntries(Object.keys(defaults).map(key => [key, entered[key] || defaults[key]]));
+    }
+
     function saveState() {
         localStorage.setItem(storageKey, JSON.stringify({
             selectedId: state.selectedId,
             data: state.data,
-            metadata: reportInfo()
+            metadata: enteredReportInfo()
         }));
     }
 
@@ -593,8 +861,10 @@
         }
     }
 
-    function setDefaultDate() {
-        if (!els.date.value) els.date.value = new Date().toISOString().slice(0, 10);
+    function todayIso() {
+        const now = new Date();
+        const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
+        return local.toISOString().slice(0, 10);
     }
 
     function downloadMarkdown() {
