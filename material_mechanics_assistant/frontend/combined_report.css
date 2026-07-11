@@ -1,0 +1,453 @@
+.auto-report-layout {
+    display: grid;
+    grid-template-columns: minmax(480px, 0.9fr) minmax(520px, 1.1fr);
+    gap: 12px;
+    align-items: start;
+}
+
+.report-config-area {
+    display: grid;
+    gap: 16px;
+}
+
+.compact-head {
+    margin-bottom: 0;
+}
+
+.report-step {
+    border-top: 1px solid var(--line);
+    padding-top: 15px;
+}
+
+.step-heading {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.step-heading > span {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    flex: 0 0 auto;
+    border-radius: 9px;
+    color: #fff;
+    background: var(--accent);
+    font-weight: 800;
+}
+
+.step-heading h3,
+.step-heading p {
+    margin: 0;
+}
+
+.step-heading h3 {
+    font-size: 1rem;
+}
+
+.step-heading p {
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: 0.82rem;
+}
+
+.report-experiment-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.report-experiment-button {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 9px;
+    align-items: center;
+    min-height: 54px;
+    padding: 8px 10px;
+    text-align: left;
+    border: 1px solid var(--line);
+    background: var(--surface-soft);
+}
+
+.report-experiment-button strong {
+    display: block;
+    color: var(--text);
+    font-size: 0.86rem;
+}
+
+.report-experiment-button small {
+    color: var(--muted);
+}
+
+.report-experiment-button.active {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 11%, var(--surface));
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.report-experiment-button .exp-code {
+    min-width: 42px;
+    font-weight: 800;
+    font-size: 0.75rem;
+    color: var(--accent);
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.info-grid label,
+.raw-input-form label {
+    display: grid;
+    gap: 6px;
+    color: var(--muted);
+    font-size: 0.82rem;
+}
+
+.info-grid input,
+.raw-input-form input,
+.raw-input-form textarea {
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text);
+    padding: 8px 10px;
+    font: inherit;
+}
+
+.info-grid input,
+.raw-input-form input {
+    height: 38px;
+}
+
+.raw-input-form textarea {
+    min-height: 68px;
+    resize: vertical;
+    line-height: 1.45;
+}
+
+.input-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin: -42px 0 12px;
+}
+
+.raw-input-form {
+    display: grid;
+    gap: 10px;
+    max-height: 610px;
+    overflow: auto;
+    padding-right: 4px;
+}
+
+.input-object,
+.array-entry {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface-soft);
+    padding: 10px;
+}
+
+.input-object > .object-title,
+.array-entry > .object-title {
+    margin: 0 0 9px;
+    color: var(--text);
+    font-size: 0.88rem;
+    font-weight: 750;
+}
+
+.input-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+}
+
+.input-grid .wide-field,
+.input-grid .nested-field {
+    grid-column: 1 / -1;
+}
+
+.array-entries {
+    display: grid;
+    gap: 8px;
+}
+
+.field-help {
+    color: var(--muted);
+    font-size: 0.72rem;
+}
+
+.report-toolbar {
+    display: grid;
+    grid-template-columns: 1.4fr repeat(3, 1fr);
+    gap: 8px;
+    position: sticky;
+    bottom: 8px;
+    z-index: 4;
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--surface) 94%, transparent);
+    backdrop-filter: blur(10px);
+}
+
+.ai-refine-step {
+    display: grid;
+    gap: 11px;
+    padding: 15px;
+    border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line));
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+}
+
+.ai-refine-step .step-heading {
+    margin-bottom: 0;
+}
+
+.ai-status-row,
+.ai-actions {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    flex-wrap: wrap;
+}
+
+.ai-status {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 4px 9px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 750;
+    color: var(--muted);
+    background: var(--surface-soft);
+}
+
+.ai-status[data-kind="ok"] {
+    color: #047857;
+    background: color-mix(in srgb, #10b981 14%, var(--surface));
+}
+
+.ai-status[data-kind="bad"] {
+    color: #b91c1c;
+    background: color-mix(in srgb, #ef4444 12%, var(--surface));
+}
+
+.ai-refine-grid {
+    display: grid;
+    grid-template-columns: minmax(160px, 0.42fr) minmax(260px, 1fr);
+    gap: 10px;
+}
+
+.ai-refine-grid label {
+    display: grid;
+    gap: 6px;
+    color: var(--muted);
+    font-size: 0.82rem;
+}
+
+.ai-refine-grid select,
+.ai-refine-grid textarea {
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text);
+    padding: 8px 10px;
+    font: inherit;
+}
+
+.ai-refine-grid select {
+    height: 40px;
+}
+
+.ai-refine-grid textarea {
+    min-height: 72px;
+    resize: vertical;
+    line-height: 1.45;
+}
+
+.ai-actions button {
+    flex: 1 1 190px;
+}
+
+.ai-security-note {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.76rem;
+    line-height: 1.55;
+}
+
+.report-preview-area {
+    position: sticky;
+    top: 14px;
+}
+
+.preview-heading > div {
+    display: grid;
+    gap: 3px;
+}
+
+.preview-badge {
+    border-radius: 999px;
+    padding: 4px 9px;
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 11%, var(--surface));
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.report-preview {
+    max-height: calc(100vh - 150px);
+    overflow: auto;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #fff;
+    color: #111827;
+    padding: 26px;
+}
+
+.empty-preview {
+    min-height: 260px;
+    display: grid;
+    place-items: center;
+    color: var(--muted);
+    background: var(--surface-soft);
+}
+
+.report-paper {
+    font-family: "Times New Roman", "SimSun", "Songti SC", serif;
+    line-height: 1.72;
+    font-size: 15px;
+}
+
+.report-paper h1,
+.report-paper h2,
+.report-paper h3 {
+    font-family: "SimHei", "Microsoft YaHei", sans-serif;
+    color: #111827;
+}
+
+.report-paper h1 {
+    text-align: center;
+    font-size: 27px;
+    margin: 2px 0 12px;
+}
+
+.report-paper h2 {
+    margin: 20px 0 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #d1d5db;
+    font-size: 18px;
+}
+
+.report-paper h3 {
+    margin: 13px 0 6px;
+    font-size: 16px;
+}
+
+.report-paper p {
+    margin: 6px 0;
+    text-align: justify;
+}
+
+.report-paper ul,
+.report-paper ol {
+    margin: 6px 0 10px 22px;
+    padding: 0;
+}
+
+.report-data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 9px 0 14px;
+    font-size: 12.5px;
+}
+
+.report-data-table th,
+.report-data-table td {
+    border: 1px solid #374151;
+    padding: 5px 6px;
+    text-align: center;
+    vertical-align: middle;
+}
+
+.report-data-table th {
+    background: #f3f4f6;
+    font-weight: 700;
+}
+
+.report-formula {
+    overflow-x: auto;
+    margin: 9px 0;
+    padding: 8px 10px;
+    border-left: 3px solid #0f766e;
+    background: #f9fafb;
+}
+
+.report-paper blockquote {
+    margin: 8px 0;
+    padding: 7px 10px;
+    border-left: 3px solid #9ca3af;
+    color: #4b5563;
+    background: #f9fafb;
+}
+
+.report-paper details {
+    margin: 10px 0;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 6px 9px;
+}
+
+.report-paper img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 10px auto;
+}
+
+@media print {
+    body { background: #fff; }
+    .app-header,
+    .report-config-area,
+    .preview-heading,
+    .toast { display: none !important; }
+    .app-shell,
+    .auto-report-layout,
+    .report-preview-area,
+    .report-preview {
+        width: 100%;
+        margin: 0;
+        display: block;
+        box-shadow: none;
+        border: none;
+        max-height: none;
+        overflow: visible;
+        padding: 0;
+    }
+}
+
+@media (max-width: 1120px) {
+    .auto-report-layout { grid-template-columns: 1fr; }
+    .report-preview-area { position: static; }
+    .report-preview { max-height: none; }
+}
+
+@media (max-width: 680px) {
+    .report-experiment-list,
+    .info-grid,
+    .input-grid,
+    .ai-refine-grid,
+    .report-toolbar { grid-template-columns: 1fr; }
+    .input-actions { margin: 0 0 10px; justify-content: flex-start; }
+    .report-preview { padding: 16px; }
+}

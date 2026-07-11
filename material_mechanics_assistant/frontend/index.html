@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>材料力学实验助手</title>
+    <link rel="stylesheet" href="style.css">
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [["\\(", "\\)"], ["$", "$"]],
+                displayMath: [["\\[", "\\]"], ["$$", "$$"]],
+                processEscapes: true
+            },
+            svg: { fontCache: "global" },
+            startup: { typeset: false }
+        };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" async></script>
+    <script src="common.js" defer></script>
+    <script src="app.js" defer></script>
+</head>
+<body>
+    <div class="app-shell">
+        <header class="app-header">
+            <div class="brand-block">
+                <div class="brand-mark" aria-hidden="true">
+                    <span></span><span></span><span></span>
+                </div>
+                <div>
+                    <h1>材料力学实验助手</h1>
+                    <p>B011 - B081 数据处理工作台</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button id="themeToggle" class="icon-button" title="切换深色模式" aria-label="切换深色模式">
+                    <span class="button-icon">◐</span>
+                </button>
+                <a class="repo-link" href="combined_report.html">自动生成报告</a>
+                <a class="repo-link" href="https://github.com/w-Steve/BUAA-Physics-Labs" target="_blank" rel="noreferrer">参考架构</a>
+            </div>
+        </header>
+
+        <main class="workspace">
+            <aside class="experiment-panel">
+                <div class="panel-title">实验目录</div>
+                <div id="experimentList" class="experiment-list"></div>
+            </aside>
+
+            <section class="work-area">
+                <div class="experiment-head">
+                    <div>
+                        <div id="currentCode" class="experiment-code">B---</div>
+                        <h2 id="currentTitle">加载中</h2>
+                        <p id="currentFocus"></p>
+                    </div>
+                    <div id="serverState" class="server-state">连接中</div>
+                </div>
+
+                <div class="toolbar">
+                    <button id="loadTemplateBtn" title="载入当前实验完整示例">
+                        <span class="button-icon">↺</span><span>完整示例</span>
+                    </button>
+                    <button id="addRowBtn" title="新增一行">
+                        <span class="button-icon">＋</span><span>加行</span>
+                    </button>
+                    <button id="trimRowsBtn" title="删除空白行">
+                        <span class="button-icon">⌫</span><span>清空行</span>
+                    </button>
+                    <button id="importBtn" title="导入 CSV">
+                        <span class="button-icon">⇧</span><span>导入</span>
+                    </button>
+                    <button id="exportBtn" title="导出当前输入 CSV">
+                        <span class="button-icon">⇩</span><span>导出</span>
+                    </button>
+                    <button id="calculateBtn" class="primary" title="计算当前表格">
+                        <span class="button-icon">=</span><span>计算</span>
+                    </button>
+                    <input id="csvFileInput" type="file" accept=".csv,text/csv" hidden>
+                </div>
+
+                <div id="calcStatus" class="calc-status hidden"></div>
+
+                <section id="resultSection" class="result-section hidden">
+                    <div class="section-line">
+                        <h3>处理结果</h3>
+                        <div id="resultMeta" class="muted-text"></div>
+                    </div>
+                    <div id="summaryHighlights" class="summary-grid"></div>
+                    <div id="summaryConclusion" class="conclusion-box hidden"></div>
+                    <div id="resultTableWrap" class="table-wrap output-wrap"></div>
+                    <details class="json-details">
+                        <summary>summary JSON</summary>
+                        <pre id="summaryJson"></pre>
+                    </details>
+                </section>
+
+                <section class="theory-section">
+                    <div class="section-line">
+                        <h3>讲义参数说明</h3>
+                        <div id="theoryMeta" class="muted-text"></div>
+                    </div>
+                    <div id="parameterGuide" class="parameter-grid"></div>
+                    <div id="formulaGuide" class="formula-strip"></div>
+                </section>
+
+                <section class="data-section">
+                    <div class="section-line">
+                        <h3>原始数据</h3>
+                        <div id="tableMeta" class="muted-text"></div>
+                    </div>
+                    <div id="tableWrap" class="table-wrap"></div>
+                </section>
+            </section>
+        </main>
+    </div>
+    <div id="toast" class="toast hidden"></div>
+</body>
+</html>

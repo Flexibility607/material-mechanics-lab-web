@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>材料力学实验报告生成器</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="combined_report.css">
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [["\\(", "\\)"], ["$", "$"]],
+                displayMath: [["\\[", "\\]"], ["$$", "$$"]],
+                processEscapes: true
+            },
+            svg: { fontCache: "global" },
+            startup: { typeset: false }
+        };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" async></script>
+    <script src="common.js" defer></script>
+    <script src="combined_report.js" defer></script>
+</head>
+<body>
+    <div class="app-shell">
+        <header class="app-header">
+            <div class="brand-block">
+                <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+                <div>
+                    <h1>材料力学实验报告生成器</h1>
+                    <p>填写原始数据，自动替换数据处理与数值结论</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button id="themeToggle" class="icon-button" title="切换深色模式" aria-label="切换深色模式"><span class="button-icon">◐</span></button>
+                <a class="repo-link" href="index.html">数据处理工作台</a>
+            </div>
+        </header>
+
+        <main class="auto-report-layout">
+            <section class="work-area report-config-area">
+                <div class="experiment-head compact-head">
+                    <div>
+                        <div class="experiment-code">AUTO REPORT</div>
+                        <h2>选择实验并填写数据</h2>
+                        <p>固定文字来自已校核的手写报告，只有原始数据、计算表和数值结论会变化。</p>
+                    </div>
+                    <div id="serverState" class="server-state">连接中</div>
+                </div>
+
+                <section class="report-step">
+                    <div class="step-heading"><span>1</span><div><h3>实验项目</h3><p>七次实验使用同一套报告流程</p></div></div>
+                    <div id="reportExperimentList" class="report-experiment-list"></div>
+                </section>
+
+                <section class="report-step">
+                    <div class="step-heading"><span>2</span><div><h3>报告信息</h3><p>用于替换报告页首信息</p></div></div>
+                    <div class="info-grid">
+                        <label>课程教师<input id="teacher" placeholder="例如：指导教师"></label>
+                        <label>学号<input id="studentId" placeholder="请输入学号"></label>
+                        <label>班级<input id="className" placeholder="请输入班级"></label>
+                        <label>姓名<input id="studentName" placeholder="请输入姓名"></label>
+                        <label>同组者<input id="partners" placeholder="请输入同组者"></label>
+                        <label>日期<input id="date" type="date"></label>
+                    </div>
+                </section>
+
+                <section class="report-step raw-data-step">
+                    <div class="step-heading">
+                        <span>3</span>
+                        <div><h3 id="rawDataTitle">原始数据</h3><p id="rawDataHint">数列使用逗号分隔，矩阵每行代表一个加载级</p></div>
+                    </div>
+                    <div class="input-actions">
+                        <button id="loadExampleBtn"><span class="button-icon">↺</span><span>载入报告算例</span></button>
+                        <button id="resetCurrentBtn"><span class="button-icon">⌫</span><span>恢复本实验</span></button>
+                    </div>
+                    <div id="rawInputForm" class="raw-input-form"></div>
+                </section>
+
+                <div class="report-toolbar">
+                    <button id="calculateReportBtn" class="primary"><span class="button-icon">=</span><span>计算并生成报告</span></button>
+                    <button id="downloadMarkdownBtn" disabled><span class="button-icon">⇩</span><span>下载 Markdown</span></button>
+                    <button id="downloadHtmlBtn" disabled><span class="button-icon">⇩</span><span>下载 HTML</span></button>
+                    <button id="printBtn" disabled><span class="button-icon">⎙</span><span>打印/PDF</span></button>
+                </div>
+
+                <section class="report-step ai-refine-step">
+                    <div class="step-heading">
+                        <span>4</span>
+                        <div><h3>OpenAI 轻度润色</h3><p>只调整普通叙述，标题、数字、单位、公式、表格和图片会被锁定</p></div>
+                    </div>
+                    <div class="ai-status-row">
+                        <span id="openaiStatus" class="ai-status" data-kind="busy">检测配置中</span>
+                        <span id="openaiModel" class="muted-text"></span>
+                    </div>
+                    <div class="ai-refine-grid">
+                        <label>润色方式
+                            <select id="refineMode">
+                                <option value="light">轻微润色</option>
+                                <option value="formal">更规范</option>
+                                <option value="concise">稍微精简</option>
+                            </select>
+                        </label>
+                        <label class="wide-field">补充要求（可选）
+                            <textarea id="refineInstruction" maxlength="300" placeholder="例如：保持本科生口吻，减少重复表达"></textarea>
+                        </label>
+                    </div>
+                    <div class="ai-actions">
+                        <button id="refineReportBtn" class="primary" disabled><span class="button-icon">✦</span><span>轻度润色当前报告</span></button>
+                        <button id="restoreCalculatedBtn" disabled><span class="button-icon">↶</span><span>恢复计算原稿</span></button>
+                    </div>
+                    <p class="ai-security-note">API 密钥只从本机服务端环境读取，不会进入网页或浏览器存储。点击润色后，当前整份报告（可能含姓名、学号）会发送给所配置的 API；AI 输出必须通过数字、单位和报告结构保护校验后才会替换预览。</p>
+                </section>
+                <div id="calcStatus" class="calc-status hidden"></div>
+            </section>
+
+            <section class="work-area report-preview-area">
+                <div class="section-line preview-heading">
+                    <div>
+                        <h3>自动生成报告</h3>
+                        <div id="reportMeta" class="muted-text">尚未生成</div>
+                    </div>
+                    <span class="preview-badge">固定正文 + 动态数据</span>
+                </div>
+                <div id="reportPreview" class="report-preview empty-preview">
+                    选择实验、确认原始数据后，点击“计算并生成报告”。
+                </div>
+            </section>
+        </main>
+    </div>
+    <div id="toast" class="toast hidden"></div>
+</body>
+</html>
