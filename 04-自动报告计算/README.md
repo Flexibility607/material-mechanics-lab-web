@@ -48,6 +48,7 @@
 - `sample_output/sample_result.json`：完整机器可读计算结果。
 - `sample_output/sample_calculation_report.md`：可直接复制进实验报告的数据处理摘要。
 - `test_calculator.py`：关键结果回归测试。
+- `test_sample_shapes.py`：逐字段校核数组长度和矩阵行列数，确保报告算例与手写报告记录数量一致。
 
 ## 四、运行方法
 

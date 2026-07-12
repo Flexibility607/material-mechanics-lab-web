@@ -8,7 +8,7 @@ from server import OpenAIIntegrationError, call_openai_responses, validate_refin
 
 ORIGINAL = """# 材料力学实验报告
 
-- 学号：20260000
+- 学号：3088
 
 ## 一、实验结论
 

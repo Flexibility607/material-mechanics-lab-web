@@ -1,638 +1,220 @@
 {
-    "metadata":  {
-                     "teacher":  "指导教师",
-                     "student_id":  "20260000",
-                     "class":  "示例班级",
-                     "name":  "示例学生",
-                     "partner":  "示例同学",
-                     "source":  "公开脱敏算例"
-                 },
-    "experiments":  {
-                        "mechanical_properties":  {
-                                                      "tension":  [
-                                                                      {
-                                                                          "material":  "低碳钢",
-                                                                          "d0_mm":  10.0,
-                                                                          "d0_measurements_mm":  [
-                                                                                                     10.0,
-                                                                                                     10.01,
-                                                                                                     10.04,
-                                                                                                     10.02,
-                                                                                                     9.99,
-                                                                                                     9.98,
-                                                                                                     10.0,
-                                                                                                     10.02,
-                                                                                                     10.03,
-                                                                                                     10.02,
-                                                                                                     10.02,
-                                                                                                     9.99,
-                                                                                                     9.97,
-                                                                                                     9.97,
-                                                                                                     9.97,
-                                                                                                     9.96,
-                                                                                                     9.97,
-                                                                                                     9.99
-                                                                                                 ],
-                                                                          "d1_mm":  [
-                                                                                        6.03,
-                                                                                        6.19,
-                                                                                        6.18
-                                                                                    ],
-                                                                          "report_d1_mm":  6.13,
-                                                                          "l0_mm":  [
-                                                                                        99.91,
-                                                                                        99.89,
-                                                                                        99.93
-                                                                                    ],
-                                                                          "l1_mm":  [
-                                                                                        130.87,
-                                                                                        129.98,
-                                                                                        130.97
-                                                                                    ],
-                                                                          "report_l1_mm":  130.61,
-                                                                          "yield_force_kN":  24.52,
-                                                                          "max_force_kN":  35.25,
-                                                                          "observation":  "出现屈服、强化和缩颈，断口呈杯状"
-                                                                      },
-                                                                      {
-                                                                          "material":  "铸铁",
-                                                                          "d0_mm":  10.0,
-                                                                          "max_force_kN":  11.05,
-                                                                          "observation":  "变形小，无明显屈服和缩颈，断口近似垂直轴线",
-                                                                          "data_note":  "报告只记录强度结果；算例中的峰值载荷由报告强度和直径反算"
-                                                                      }
-                                                                  ],
-                                                      "compression":  [
-                                                                          {
-                                                                              "material":  "低碳钢",
-                                                                              "d0_mm":  10.02,
-                                                                              "h0_mm":  15.03,
-                                                                              "yield_force_kN":  23.6,
-                                                                              "terminal_force_kN":  197.15,
-                                                                              "d1_mm":  17.70,
-                                                                              "h1_mm":  4.95,
-                                                                              "observation":  "屈服后塑性变形增大，试件呈腰鼓形"
-                                                                          },
-                                                                          {
-                                                                              "material":  "铸铁",
-                                                                              "d0_mm":  9.95,
-                                                                              "strength_diameter_mm":  11.62,
-                                                                              "h0_mm":  15.13,
-                                                                              "max_force_kN":  60.81,
-                                                                              "d1_mm":  11.62,
-                                                                              "h1_mm":  12.64,
-                                                                              "observation":  "断口与轴线约成55度"
-                                                                          }
-                                                                      ],
-                                                      "torsion":  [
-                                                                      {
-                                                                          "material":  "低碳钢",
-                                                                          "d0_mm":  10.0,
-                                                                          "max_torque_Nm":  101.33,
-                                                                          "twist_angle_deg":  2117.59,
-                                                                          "observation":  "塑性转角大，沿垂直轴线横截面剪断"
-                                                                      },
-                                                                      {
-                                                                          "material":  "铸铁",
-                                                                          "d0_mm":  10.0,
-                                                                          "max_torque_Nm":  49.31,
-                                                                          "twist_angle_deg":  69.38,
-                                                                          "observation":  "沿与轴线约成45度的螺旋面断裂"
-                                                                      }
-                                                                  ]
-                                                  },
-                        "elastic_constants":  {
-                                                  "material":  "7075铝合金",
-                                                  "width_mm":  [
-                                                                   24.42,
-                                                                   24.46,
-                                                                   24.41
-                                                               ],
-                                                  "thickness_mm":  [
-                                                                       8.03,
-                                                                       7.99,
-                                                                       8.04
-                                                                   ],
-                                                  "axial_channels":  [
-                                                                         0,
-                                                                         3
-                                                                     ],
-                                                  "transverse_channels":  [
-                                                                              1,
-                                                                              2
-                                                                          ],
-                                                  "runs":  [
-                                                               {
-                                                                   "loads_kN":  [
-                                                                                    2,
-                                                                                    6,
-                                                                                    10,
-                                                                                    14,
-                                                                                    18
-                                                                                ],
-                                                                   "readings_micro":  [
-                                                                                          [
-                                                                                              0,
-                                                                                              0,
-                                                                                              0,
-                                                                                              0
-                                                                                          ],
-                                                                                          [
-                                                                                              307,
-                                                                                              -98,
-                                                                                              -97,
-                                                                                              291
-                                                                                          ],
-                                                                                          [
-                                                                                              618,
-                                                                                              -197,
-                                                                                              -192,
-                                                                                              582
-                                                                                          ],
-                                                                                          [
-                                                                                              927,
-                                                                                              -295,
-                                                                                              -288,
-                                                                                              877
-                                                                                          ],
-                                                                                          [
-                                                                                              1234,
-                                                                                              -393,
-                                                                                              -384,
-                                                                                              1173
-                                                                                          ]
-                                                                                      ]
-                                                               },
-                                                               {
-                                                                   "loads_kN":  [
-                                                                                    2,
-                                                                                    6,
-                                                                                    10,
-                                                                                    14,
-                                                                                    18
-                                                                                ],
-                                                                   "readings_micro":  [
-                                                                                          [
-                                                                                              0,
-                                                                                              0,
-                                                                                              0,
-                                                                                              0
-                                                                                          ],
-                                                                                          [
-                                                                                              305,
-                                                                                              -100,
-                                                                                              -98,
-                                                                                              289
-                                                                                          ],
-                                                                                          [
-                                                                                              616,
-                                                                                              -199,
-                                                                                              -194,
-                                                                                              580
-                                                                                          ],
-                                                                                          [
-                                                                                              924,
-                                                                                              -298,
-                                                                                              -291,
-                                                                                              872
-                                                                                          ],
-                                                                                          [
-                                                                                              1231,
-                                                                                              -397,
-                                                                                              -388,
-                                                                                              1168
-                                                                                          ]
-                                                                                      ]
-                                                               },
-                                                               {
-                                                                   "loads_kN":  [
-                                                                                    2,
-                                                                                    6,
-                                                                                    10,
-                                                                                    14,
-                                                                                    18
-                                                                                ],
-                                                                   "readings_micro":  [
-                                                                                          [
-                                                                                              0,
-                                                                                              0,
-                                                                                              0,
-                                                                                              0
-                                                                                          ],
-                                                                                          [
-                                                                                              304,
-                                                                                              -100,
-                                                                                              -99,
-                                                                                              289
-                                                                                          ],
-                                                                                          [
-                                                                                              613,
-                                                                                              -200,
-                                                                                              -196,
-                                                                                              578
-                                                                                          ],
-                                                                                          [
-                                                                                              921,
-                                                                                              -300,
-                                                                                              -292,
-                                                                                              871
-                                                                                          ],
-                                                                                          [
-                                                                                              1227,
-                                                                                              -399,
-                                                                                              -388,
-                                                                                              1166
-                                                                                          ]
-                                                                                      ]
-                                                               }
-                                                           ]
-                                              },
-                        "shear_modulus":  {
-                                              "diameter_mm":  [
-                                                                  59.91,
-                                                                  59.9,
-                                                                  59.9,
-                                                                  59.89
-                                                              ],
-                                              "torque_arm_mm":  198.0,
-                                              "gauge_length_mm":  143.05,
-                                              "dial_arm_mm":  103.0,
-                                              "dial_run":  {
-                                                               "loads_kN":  [
-                                                                                0.5,
-                                                                                1.5,
-                                                                                2.5,
-                                                                                3.5,
-                                                                                4.5
-                                                                            ],
-                                                               "dial_mm":  [
-                                                                               0.0,
-                                                                               0.076,
-                                                                               0.158,
-                                                                               0.243,
-                                                                               0.324
-                                                                           ]
-                                                           },
-                                              "half_bridge_runs":  [
-                                                                       {
-                                                                           "loads_kN":  [
-                                                                                            0.5,
-                                                                                            1.5,
-                                                                                            2.5,
-                                                                                            3.5,
-                                                                                            4.5
-                                                                                        ],
-                                                                           "channel_1_micro":  [
-                                                                                                   0,
-                                                                                                   175,
-                                                                                                   348,
-                                                                                                   525,
-                                                                                                   701
-                                                                                               ],
-                                                                           "channel_2_micro":  [
-                                                                                                   0,
-                                                                                                   177,
-                                                                                                   353,
-                                                                                                   532,
-                                                                                                   711
-                                                                                               ],
-                                                                           "reading_to_gamma_factor":  1.0
-                                                                       },
-                                                                       {
-                                                                           "loads_kN":  [
-                                                                                            0.5,
-                                                                                            1.5,
-                                                                                            2.5,
-                                                                                            3.5,
-                                                                                            4.5
-                                                                                        ],
-                                                                           "channel_1_micro":  [
-                                                                                                   0,
-                                                                                                   176,
-                                                                                                   349,
-                                                                                                   527,
-                                                                                                   705
-                                                                                               ],
-                                                                           "channel_2_micro":  [
-                                                                                                   0,
-                                                                                                   179,
-                                                                                                   355,
-                                                                                                   534,
-                                                                                                   713
-                                                                                               ],
-                                                                           "reading_to_gamma_factor":  1.0
-                                                                       }
-                                                                   ],
-                                              "report_run_index":  2,
-                                              "full_bridge":  {
-                                                                  "loads_kN":  [
-                                                                                   0.5,
-                                                                                   1.5,
-                                                                                   2.5,
-                                                                                   3.5,
-                                                                                   4.5
-                                                                               ],
-                                                                  "readings_micro":  [
-                                                                                         0,
-                                                                                         357,
-                                                                                         712,
-                                                                                         1064,
-                                                                                         1449
-                                                                                     ],
-                                                                  "reading_to_gamma_factor":  0.5
-                                                              }
-                                          },
-                        "beam_bending":  {
-                                             "E_GPa":  210.0,
-                                             "mu":  0.28,
-                                             "width_mm":  [
-                                                              30.06,
-                                                              30.08,
-                                                              30.09
-                                                          ],
-                                             "height_mm":  [
-                                                               49.84,
-                                                               49.92,
-                                                               49.81
-                                                           ],
-                                             "delta_force_kN":  8.0,
-                                             "load_spacing_mm":  100.0,
-                                             "longitudinal_points":  [
-                                                                         {
-                                                                             "gage":  "2",
-                                                                             "y_mm":  -25,
-                                                                             "readings_micro":  [
-                                                                                                    -157,
-                                                                                                    -155
-                                                                                                ]
-                                                                         },
-                                                                         {
-                                                                             "gage":  "3",
-                                                                             "y_mm":  -20,
-                                                                             "valid":  false,
-                                                                             "note":  "应变片损坏"
-                                                                         },
-                                                                         {
-                                                                             "gage":  "4",
-                                                                             "y_mm":  -10,
-                                                                             "readings_micro":  [
-                                                                                                    -63,
-                                                                                                    -63
-                                                                                                ]
-                                                                         },
-                                                                         {
-                                                                             "gage":  "5",
-                                                                             "y_mm":  0,
-                                                                             "readings_micro":  [
-                                                                                                    -2,
-                                                                                                    -2
-                                                                                                ]
-                                                                         },
-                                                                         {
-                                                                             "gage":  "7",
-                                                                             "y_mm":  10,
-                                                                             "readings_micro":  [
-                                                                                                    60,
-                                                                                                    60
-                                                                                                ]
-                                                                         },
-                                                                         {
-                                                                             "gage":  "8",
-                                                                             "y_mm":  20,
-                                                                             "readings_micro":  [
-                                                                                                    119,
-                                                                                                    119
-                                                                                                ]
-                                                                         },
-                                                                         {
-                                                                             "gage":  "9",
-                                                                             "y_mm":  25,
-                                                                             "readings_micro":  [
-                                                                                                    151,
-                                                                                                    153
-                                                                                                ]
-                                                                         }
-                                                                     ],
-                                             "poisson_surfaces":  [
-                                                                      {
-                                                                          "surface":  "上表面",
-                                                                          "longitudinal_micro":  [
-                                                                                                     -157,
-                                                                                                     -155
-                                                                                                 ],
-                                                                          "transverse_micro":  [
-                                                                                                   43,
-                                                                                                   44
-                                                                                               ]
-                                                                      },
-                                                                      {
-                                                                          "surface":  "下表面",
-                                                                          "longitudinal_micro":  [
-                                                                                                     151,
-                                                                                                     153
-                                                                                                 ],
-                                                                          "transverse_micro":  [
-                                                                                                   -45,
-                                                                                                   -43
-                                                                                               ]
-                                                                      }
-                                                                  ],
-                                             "full_bridge":  {
-                                                                 "readings_micro":  [
-                                                                                        -624
-                                                                                    ],
-                                                                 "display_factor":  4.0
-                                                             }
-                                         },
-                        "beam_deformation":  {
-                                                 "simply_supported":  {
-                                                                          "E_GPa":  210.0,
-                                                                          "length_mm":  [
-                                                                                            700.0,
-                                                                                            699.8,
-                                                                                            699.5
-                                                                                        ],
-                                                                          "width_mm":  [
-                                                                                           19.95,
-                                                                                           19.99,
-                                                                                           19.91
-                                                                                       ],
-                                                                          "height_mm":  [
-                                                                                            8.94,
-                                                                                            8.97,
-                                                                                            8.98
-                                                                                        ],
-                                                                          "delta_load_N":  19.6,
-                                                                          "central_deflection_mm":  [
-                                                                                                        0.556,
-                                                                                                        0.566,
-                                                                                                        0.56,
-                                                                                                        0.556
-                                                                                                    ],
-                                                                          "angle_indicator_delta_mm":  [
-                                                                                                           0.367,
-                                                                                                           0.357,
-                                                                                                           0.36,
-                                                                                                           0.36
-                                                                                                       ],
-                                                                          "angle_arm_mm":  150.0,
-                                                                          "reciprocity_12_mm":  [
-                                                                                                    0.381,
-                                                                                                    0.38,
-                                                                                                    0.381,
-                                                                                                    0.38
-                                                                                                ],
-                                                                          "reciprocity_21_mm":  [
-                                                                                                    0.378,
-                                                                                                    0.38,
-                                                                                                    0.38,
-                                                                                                    0.379
-                                                                                                ],
-                                                                          "curve_points":  [
-                                                                                               {
-                                                                                                   "x_mm":  168.0,
-                                                                                                   "deflection_mm":  -0.381
-                                                                                               },
-                                                                                               {
-                                                                                                   "x_mm":  244.0,
-                                                                                                   "deflection_mm":  -0.503
-                                                                                               },
-                                                                                               {
-                                                                                                   "x_mm":  344.9,
-                                                                                                   "deflection_mm":  -0.56
-                                                                                               }
-                                                                                           ]
-                                                                      },
-                                                 "cantilever":  {
-                                                                    "E_GPa":  210.0,
-                                                                    "width_mm":  [
-                                                                                     14.0,
-                                                                                     14.01,
-                                                                                     14.02
-                                                                                 ],
-                                                                    "height_mm":  [
-                                                                                      7.06,
-                                                                                      7.05,
-                                                                                      7.0
-                                                                                  ],
-                                                                    "position_spacing_mm":  300.0,
-                                                                    "strain_position_1_micro":  [
-                                                                                                    151,
-                                                                                                    151,
-                                                                                                    152,
-                                                                                                    151
-                                                                                                ],
-                                                                    "strain_position_2_micro":  [
-                                                                                                    66,
-                                                                                                    65,
-                                                                                                    65,
-                                                                                                    64
-                                                                                                ],
-                                                                    "gravity_m_s2":  9.8
-                                                                }
-                                             },
-                        "bending_torsion":  {
-                                                "material":  "铝合金",
-                                                "E_GPa":  71.0,
-                                                "mu":  0.33,
-                                                "diameter_mm":  [
-                                                                    59.99,
-                                                                    59.95,
-                                                                    59.94
-                                                                ],
-                                                "delta_force_kN":  4.0,
-                                                "bending_arm_mm":  240.0,
-                                                "torsion_arm_mm":  200.0,
-                                                "rosettes":  {
-                                                                 "upper":  {
-                                                                               "epsilon_p45_micro":  [
-                                                                                                         -149,
-                                                                                                         -147,
-                                                                                                         -147,
-                                                                                                         -148
-                                                                                                     ],
-                                                                               "epsilon_0_micro":  [
-                                                                                                       622,
-                                                                                                       627,
-                                                                                                       627,
-                                                                                                       626
-                                                                                                   ],
-                                                                               "epsilon_m45_micro":  [
-                                                                                                         601,
-                                                                                                         599,
-                                                                                                         605,
-                                                                                                         607
-                                                                                                     ]
-                                                                           },
-                                                                 "lower":  {
-                                                                               "epsilon_p45_micro":  [
-                                                                                                         -578,
-                                                                                                         -586,
-                                                                                                         -576,
-                                                                                                         -578
-                                                                                                     ],
-                                                                               "epsilon_0_micro":  [
-                                                                                                       -628,
-                                                                                                       -624,
-                                                                                                       -627,
-                                                                                                       -625
-                                                                                                   ],
-                                                                               "epsilon_m45_micro":  [
-                                                                                                         144,
-                                                                                                         142,
-                                                                                                         146,
-                                                                                                         143
-                                                                                                     ]
-                                                                           }
-                                                             },
-                                                "half_bridge_bending":  {
-                                                                            "readings_micro":  [
-                                                                                                   1291,
-                                                                                                   1294,
-                                                                                                   1293,
-                                                                                                   1291
-                                                                                               ],
-                                                                            "display_factor":  2.0
-                                                                        },
-                                                "full_bridge_torsion":  {
-                                                                            "readings_micro":  [
-                                                                                                   1436,
-                                                                                                   1438,
-                                                                                                   1437,
-                                                                                                   1435
-                                                                                               ],
-                                                                            "display_factor":  2.0
-                                                                        }
-                                            },
-                        "eccentric_tension":  {
-                                                  "material":  "不锈钢",
-                                                  "delta_force_kN":  30.0,
-                                                  "h_mm":  8.0,
-                                                  "b_mm":  50.0,
-                                                  "quarter_bridge_epsilon_a_micro":  [
-                                                                                         1296,
-                                                                                         1290,
-                                                                                         1294,
-                                                                                         1291
-                                                                                     ],
-                                                  "quarter_bridge_epsilon_b_micro":  [
-                                                                                         -522,
-                                                                                         -521,
-                                                                                         -519,
-                                                                                         -518
-                                                                                     ],
-                                                  "full_bridge_2epsilon_F_micro":  [
-                                                                                       773,
-                                                                                       772,
-                                                                                       772,
-                                                                                       771
-                                                                                   ],
-                                                  "half_bridge_2epsilon_M_micro":  [
-                                                                                       -1824,
-                                                                                       -1821,
-                                                                                       -1823,
-                                                                                       -1819
-                                                                                   ]
-                                              }
-                    }
+  "metadata": {
+    "theory_teacher": "mqc老师",
+    "experiment_teachers": "zm老师，sxh老师",
+    "teacher": "mqc老师",
+    "student_id": "3088",
+    "class": "242311",
+    "name": "时效性",
+    "partner": "龙小糖",
+    "date": "2026.7.12",
+    "source": "公开算例"
+  },
+  "experiments": {
+    "mechanical_properties": {
+      "tension": [
+        {
+          "material": "低碳钢",
+          "d0_mm": 10.0,
+          "d0_measurements_mm": [10.0, 10.01, 10.04, 10.02, 9.99, 9.98, 10.0, 10.02, 10.03, 10.02, 10.02, 9.99, 9.97, 9.97, 9.97, 9.96, 9.97, 9.99],
+          "d1_mm": [6.03, 6.19, 6.18],
+          "report_d1_mm": 6.13,
+          "l0_mm": [99.91, 99.89, 99.93],
+          "l1_mm": [130.87, 129.98, 130.97],
+          "report_l1_mm": 130.61,
+          "yield_force_kN": 24.52,
+          "max_force_kN": 35.25,
+          "observation": "出现屈服、强化和缩颈，断口呈杯状"
+        },
+        {
+          "material": "铸铁",
+          "d0_mm": 10.0,
+          "max_force_kN": 11.05,
+          "observation": "变形小，无明显屈服和缩颈，断口近似垂直轴线",
+          "data_note": "报告只记录强度结果；算例中的峰值载荷由报告强度和直径反算"
+        }
+      ],
+      "compression": [
+        {
+          "material": "低碳钢",
+          "d0_mm": 10.02,
+          "h0_mm": 15.03,
+          "yield_force_kN": 23.6,
+          "terminal_force_kN": 197.15,
+          "d1_mm": 17.70,
+          "h1_mm": 4.95,
+          "observation": "屈服后塑性变形增大，试件呈腰鼓形"
+        },
+        {
+          "material": "铸铁",
+          "d0_mm": 9.95,
+          "strength_diameter_mm": 11.62,
+          "h0_mm": 15.13,
+          "max_force_kN": 60.81,
+          "d1_mm": 11.62,
+          "h1_mm": 12.64,
+          "observation": "断口与轴线约成55度"
+        }
+      ],
+      "torsion": [
+        {
+          "material": "低碳钢",
+          "d0_mm": 10.0,
+          "max_torque_Nm": 101.33,
+          "twist_angle_deg": 2117.59,
+          "observation": "塑性转角大，沿垂直轴线横截面剪断"
+        },
+        {
+          "material": "铸铁",
+          "d0_mm": 10.0,
+          "max_torque_Nm": 49.31,
+          "twist_angle_deg": 69.38,
+          "observation": "沿与轴线约成45度的螺旋面断裂"
+        }
+      ]
+    },
+    "elastic_constants": {
+      "material": "7075铝合金",
+      "width_mm": [24.42, 24.46, 24.41],
+      "thickness_mm": [8.03, 7.99, 8.04],
+      "axial_channels": [0, 3],
+      "transverse_channels": [1, 2],
+      "runs": [
+        {
+          "loads_kN": [2, 6, 10, 14, 18],
+          "readings_micro": [[0, 0, 0, 0], [307, -98, -97, 291], [618, -197, -192, 582], [927, -295, -288, 877], [1234, -393, -384, 1173]]
+        },
+        {
+          "loads_kN": [2, 6, 10, 14, 18],
+          "readings_micro": [[0, 0, 0, 0], [305, -100, -98, 289], [616, -199, -194, 580], [924, -298, -291, 872], [1231, -397, -388, 1168]]
+        },
+        {
+          "loads_kN": [2, 6, 10, 14, 18],
+          "readings_micro": [[0, 0, 0, 0], [304, -100, -99, 289], [613, -200, -196, 578], [921, -300, -292, 871], [1227, -399, -388, 1166]]
+        }
+      ]
+    },
+    "shear_modulus": {
+      "diameter_mm": [59.91, 59.9, 59.9, 59.89],
+      "torque_arm_mm": 198.0,
+      "gauge_length_mm": 143.05,
+      "dial_arm_mm": 103.0,
+      "dial_run": {
+        "loads_kN": [0.5, 1.5, 2.5, 3.5, 4.5],
+        "dial_mm": [0.0, 0.076, 0.158, 0.243, 0.324]
+      },
+      "half_bridge_runs": [
+        {
+          "loads_kN": [0.5, 1.5, 2.5, 3.5, 4.5],
+          "channel_1_micro": [0, 175, 348, 525, 701],
+          "channel_2_micro": [0, 177, 353, 532, 711],
+          "reading_to_gamma_factor": 1.0
+        },
+        {
+          "loads_kN": [0.5, 1.5, 2.5, 3.5, 4.5],
+          "channel_1_micro": [0, 176, 349, 527, 705],
+          "channel_2_micro": [0, 179, 355, 534, 713],
+          "reading_to_gamma_factor": 1.0
+        }
+      ],
+      "report_run_index": 2,
+      "full_bridge": {
+        "loads_kN": [0.5, 1.5, 2.5, 3.5, 4.5],
+        "readings_micro": [0, 357, 712, 1064, 1449],
+        "reading_to_gamma_factor": 0.5
+      }
+    },
+    "beam_bending": {
+      "E_GPa": 210.0,
+      "mu": 0.28,
+      "width_mm": [30.06, 30.08, 30.09],
+      "height_mm": [49.84, 49.92, 49.81],
+      "delta_force_kN": 8.0,
+      "load_spacing_mm": 100.0,
+      "longitudinal_points": [
+        {"gage": "2", "y_mm": -25, "readings_micro": [-157, -155]},
+        {"gage": "3", "y_mm": -20, "valid": false, "note": "应变片损坏"},
+        {"gage": "4", "y_mm": -10, "readings_micro": [-63, -63]},
+        {"gage": "5", "y_mm": 0, "readings_micro": [-2, -2]},
+        {"gage": "7", "y_mm": 10, "readings_micro": [60, 60]},
+        {"gage": "8", "y_mm": 20, "readings_micro": [119, 119]},
+        {"gage": "9", "y_mm": 25, "readings_micro": [151, 153]}
+      ],
+      "poisson_surfaces": [
+        {"surface": "上表面", "longitudinal_micro": [-157, -155], "transverse_micro": [43, 44]},
+        {"surface": "下表面", "longitudinal_micro": [151, 153], "transverse_micro": [-45, -43]}
+      ],
+      "full_bridge": {
+        "readings_micro": [-624],
+        "display_factor": 4.0
+      }
+    },
+    "beam_deformation": {
+      "simply_supported": {
+        "E_GPa": 210.0,
+        "length_mm": [700.0, 699.8, 699.5],
+        "width_mm": [19.95, 19.99, 19.91],
+        "height_mm": [8.94, 8.97, 8.98],
+        "delta_load_N": 19.6,
+        "central_deflection_mm": [0.556, 0.566, 0.56, 0.556],
+        "angle_indicator_delta_mm": [0.367, 0.357, 0.36, 0.36],
+        "angle_arm_mm": 150.0,
+        "reciprocity_12_mm": [0.381, 0.38, 0.381, 0.38],
+        "reciprocity_21_mm": [0.378, 0.38, 0.38, 0.379],
+        "curve_points": [
+          {"x_mm": 168.0, "deflection_mm": -0.381},
+          {"x_mm": 244.0, "deflection_mm": -0.503},
+          {"x_mm": 344.9, "deflection_mm": -0.56}
+        ]
+      },
+      "cantilever": {
+        "E_GPa": 210.0,
+        "width_mm": [14.0, 14.01, 14.02],
+        "height_mm": [7.06, 7.05, 7.0],
+        "position_spacing_mm": 300.0,
+        "strain_position_1_micro": [151, 151, 152, 151],
+        "strain_position_2_micro": [66, 65, 65, 64],
+        "gravity_m_s2": 9.8
+      }
+    },
+    "bending_torsion": {
+      "material": "铝合金",
+      "E_GPa": 71.0,
+      "mu": 0.33,
+      "diameter_mm": [59.99, 59.95, 59.94],
+      "delta_force_kN": 4.0,
+      "bending_arm_mm": 240.0,
+      "torsion_arm_mm": 200.0,
+      "rosettes": {
+        "upper": {
+          "epsilon_p45_micro": [-149, -147, -147, -148],
+          "epsilon_0_micro": [622, 627, 627, 626],
+          "epsilon_m45_micro": [601, 599, 605, 607]
+        },
+        "lower": {
+          "epsilon_p45_micro": [-578, -586, -576, -578],
+          "epsilon_0_micro": [-628, -624, -627, -625],
+          "epsilon_m45_micro": [144, 142, 146, 143]
+        }
+      },
+      "half_bridge_bending": {
+        "readings_micro": [1291, 1294, 1293, 1291],
+        "display_factor": 2.0
+      },
+      "full_bridge_torsion": {
+        "readings_micro": [1436, 1438, 1437, 1435],
+        "display_factor": 2.0
+      }
+    },
+    "eccentric_tension": {
+      "material": "不锈钢",
+      "delta_force_kN": 30.0,
+      "h_mm": 8.0,
+      "b_mm": 50.0,
+      "quarter_bridge_epsilon_a_micro": [1296, 1290, 1294, 1291],
+      "quarter_bridge_epsilon_b_micro": [-522, -521, -519, -518],
+      "full_bridge_2epsilon_F_micro": [773, 772, 772, 771],
+      "half_bridge_2epsilon_M_micro": [-1824, -1821, -1823, -1819]
+    }
+  }
 }

@@ -36,6 +36,21 @@ def main():
         )
         if "实验结论" not in payload["report_markdown"]:
             raise AssertionError(f"{exp['id']} 自动报告缺少实验结论")
+        report = payload["report_markdown"]
+        for expected in (
+            "- 理论课程教师：mqc老师",
+            "- 实验课程教师：zm老师，sxh老师",
+            "- 学号：3088",
+            "- 班级：242311",
+            "- 姓名：时效性",
+            "- 同组者：龙小糖",
+            "- 日期：2026.7.12",
+            "## 附：原始记录页\n\n略。",
+        ):
+            if expected not in report:
+                raise AssertionError(f"{exp['id']} 自动报告缺少：{expected}")
+        if "<details>" in report or "images/" in report or "/report-images/" in report:
+            raise AssertionError(f"{exp['id']} 自动报告仍包含原始记录页图片")
         print(f"{exp['id']} REPORT OK markdown={len(payload['report_markdown'])}")
 
 

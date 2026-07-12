@@ -4,6 +4,8 @@
 
 原始数列和矩阵使用可增删的表格编辑器；每个实验都可下载带当前算例的 CSV 模板，在 Excel 等表格软件中批量修改后重新导入。报告信息输入框为空时，会以灰色显示并自动采用默认值。
 
+点击“计算并生成报告”后，完整报告会在独立的新页面中打开；原始记录扫描页不进入生成结果，报告末尾统一注明“原始记录页：略”。
+
 ## 在线版与本地版
 
 - GitHub Pages 在线版：计算器通过 Pyodide 在浏览器本地运行，不上传实验数据。
@@ -41,6 +43,7 @@ OPENAI_MODEL=gpt-5-mini
 
 ```powershell
 python .\04-自动报告计算\test_calculator.py
+python .\04-自动报告计算\test_sample_shapes.py
 python .\material_mechanics_assistant\backend\smoke_test.py
 node .\material_mechanics_assistant\frontend\csv_roundtrip_test.cjs
 ```

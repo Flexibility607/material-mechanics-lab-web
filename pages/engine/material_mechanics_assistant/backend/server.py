@@ -942,19 +942,39 @@ def report_block(exp_id: str, data: dict, result: dict) -> str | dict[str, str]:
 
 
 def replace_report_metadata(text: str, metadata: dict) -> str:
-    replacements = {
-        "理论课教师": metadata.get("teacher"),
-        "学号": metadata.get("student_id"),
-        "班级": metadata.get("class"),
-        "姓名": metadata.get("name"),
-        "同组者": metadata.get("partner"),
-        "日期": metadata.get("date"),
-    }
-    for label, value in replacements.items():
-        if value in (None, ""):
-            continue
-        text = re.sub(rf"^- {re.escape(label)}：.*$", f"- {label}：{value}", text, flags=re.MULTILINE)
-    return text
+    theory_teacher = metadata.get("theory_teacher") or metadata.get("teacher")
+    experiment_teachers = metadata.get("experiment_teachers")
+    values = [
+        ("理论课程教师", theory_teacher),
+        ("实验课程教师", experiment_teachers),
+        ("班级", metadata.get("class")),
+        ("姓名", metadata.get("name")),
+        ("学号", metadata.get("student_id")),
+        ("同组者", metadata.get("partner")),
+        ("日期", metadata.get("date")),
+    ]
+    text = re.sub(
+        r"^- (?:理论课教师|理论课程教师|实验课程教师|班级|姓名|学号|同组者|日期)：.*$\n?",
+        "",
+        text,
+        flags=re.MULTILINE,
+    )
+    heading = re.search(r"^# .*$", text, flags=re.MULTILINE)
+    if heading is None:
+        return text
+    lines = [f"- {label}：{value}" for label, value in values if value not in (None, "")]
+    if not lines:
+        return text
+    return text[:heading.end()].rstrip() + "\n\n" + "\n".join(lines) + "\n\n" + text[heading.end():].lstrip()
+
+
+def abbreviate_raw_record_pages(text: str) -> str:
+    """Remove scanned raw-record pages and replace their appendix with an omission note."""
+    text = re.sub(r"\n*<details>.*?</details>\s*", "\n\n", text, flags=re.DOTALL)
+    appendix = re.search(r"^## 附：[^\n]*原始记录[^\n]*$", text, flags=re.MULTILINE)
+    if appendix is not None:
+        text = text[:appendix.start()].rstrip()
+    return text.rstrip() + "\n\n## 附：原始记录页\n\n略。\n"
 
 
 def ensure_source_images(report: str, source: str) -> str:
@@ -1060,7 +1080,7 @@ def calculate_auto_report(exp_id: str, data: dict, metadata: dict) -> dict:
     module = load_auto_report_module()
     calculator = module.CALCULATORS[exp["key"]]
     result = calculator(data)
-    markdown = merge_report_markdown(exp, data, result, metadata)
+    markdown = abbreviate_raw_record_pages(merge_report_markdown(exp, data, result, metadata))
     return {
         "experiment": exp,
         "metadata": metadata,
@@ -1105,7 +1125,7 @@ def _protected_report_parts(markdown: str) -> dict[str, list[str]]:
             markdown,
         ),
         "页首信息": re.findall(
-            r"^- (?:理论课教师|学号|班级|姓名|同组者|日期|上课时间)：.*$",
+            r"^- (?:理论课教师|理论课程教师|实验课程教师|学号|班级|姓名|同组者|日期|上课时间)：.*$",
             markdown,
             flags=re.MULTILINE,
         ),

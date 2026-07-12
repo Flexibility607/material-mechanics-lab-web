@@ -13,9 +13,10 @@
     };
 
     const els = {};
-    const storageKey = "material-mechanics:auto-report:v3";
+    const storageKey = "material-mechanics:auto-report:v4";
     const metadataInputMap = {
-        teacher: "teacher",
+        theory_teacher: "theoryTeacher",
+        experiment_teachers: "experimentTeachers",
         student_id: "studentId",
         class: "className",
         name: "studentName",
@@ -151,7 +152,7 @@
             "rawInputForm", "rawDataTitle", "rawDataHint", "loadExampleBtn", "resetCurrentBtn",
             "downloadCsvTemplateBtn", "importCsvBtn", "csvFileInput",
             "calculateReportBtn", "downloadMarkdownBtn", "downloadHtmlBtn", "printBtn",
-            "reportPreview", "reportMeta", "teacher", "studentId", "className",
+            "reportPreview", "reportMeta", "theoryTeacher", "experimentTeachers", "studentId", "className",
             "studentName", "partners", "date", "openaiStatus", "openaiModel",
             "refineMode", "refineInstruction", "refineReportBtn", "restoreCalculatedBtn"
         ].forEach(id => { els[id] = document.getElementById(id); });
@@ -170,7 +171,7 @@
         els.printBtn.addEventListener("click", () => window.print());
         els.refineReportBtn.addEventListener("click", refineReport);
         els.restoreCalculatedBtn.addEventListener("click", restoreCalculatedReport);
-        ["teacher", "studentId", "className", "studentName", "partners", "date"].forEach(id => {
+        ["theoryTeacher", "experimentTeachers", "studentId", "className", "studentName", "partners", "date"].forEach(id => {
             els[id].addEventListener("input", saveState);
         });
     }
@@ -188,12 +189,13 @@
     function metadataDefaults() {
         const meta = state.catalog?.metadata || {};
         return {
-            teacher: meta.teacher || "指导教师",
-            student_id: meta.student_id || "20260000",
-            class: meta.class || "示例班级",
-            name: meta.name || "示例学生",
-            partner: meta.partner || "无",
-            date: meta.date || todayIso()
+            theory_teacher: meta.theory_teacher || meta.teacher || "mqc老师",
+            experiment_teachers: meta.experiment_teachers || "zm老师，sxh老师",
+            student_id: meta.student_id || "3088",
+            class: meta.class || "242311",
+            name: meta.name || "时效性",
+            partner: meta.partner || "龙小糖",
+            date: meta.date || "2026.7.12"
         };
     }
 
@@ -442,6 +444,7 @@
 
     async function calculateReport() {
         const exp = currentExperiment();
+        const reportWindow = openReportWindow(exp);
         try {
             setServerState("计算中", "busy");
             showStatus(`正在计算 ${exp.id} 并替换报告数据...`, "busy");
@@ -469,6 +472,7 @@
             setServerState("连接正常", "ok");
             showStatus("报告已生成。固定正文保持不变，数据表、计算结果和数值结论已更新。", "ok");
             queueMathRender([els.reportPreview]);
+            renderReportWindow(reportWindow, exp);
             saveState();
         } catch (error) {
             setServerState("计算失败", "bad");
@@ -479,7 +483,36 @@
             state.reportMarkdown = "";
             state.calculatedMarkdown = "";
             updateRefineButtons();
+            renderReportWindowError(reportWindow, error);
         }
+    }
+
+    function openReportWindow(exp) {
+        const reportWindow = window.open("", "_blank");
+        if (!reportWindow) {
+            showStatus("浏览器阻止了报告窗口，请允许本站弹出窗口后重试。", "bad");
+            return null;
+        }
+        reportWindow.document.open();
+        reportWindow.document.write(`<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(exp.id)} 报告生成中</title><style>body{margin:0;background:#f3f6f5;color:#1f2937;font-family:"Microsoft YaHei",sans-serif}.loading{display:grid;place-items:center;min-height:100vh}.loading div{padding:28px 34px;border:1px solid #d1d5db;border-radius:14px;background:#fff;box-shadow:0 14px 40px rgba(15,23,42,.08)}</style></head><body><div class="loading"><div><h2>${escapeHtml(exp.id)} ${escapeHtml(exp.title)}</h2><p>正在计算并生成实验报告…</p></div></div></body></html>`);
+        reportWindow.document.close();
+        return reportWindow;
+    }
+
+    function renderReportWindow(reportWindow, exp) {
+        if (!reportWindow || reportWindow.closed) return;
+        const title = `${exp.id} ${exp.title}实验报告`;
+        reportWindow.document.open();
+        const reportCss = downloadStyles().replace(/^body\{[^}]*\}/, "");
+        reportWindow.document.write(`<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title><script>window.MathJax={tex:{inlineMath:[["\\(","\\)"],["$","$"]],displayMath:[["\\[","\\]"],["$$","$$"]]},svg:{fontCache:"global"}};</script><script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script><style>body{margin:0;background:#eef2f1;color:#111827}.report-window-toolbar{position:sticky;top:0;z-index:5;display:flex;justify-content:space-between;align-items:center;padding:10px 18px;background:#fff;border-bottom:1px solid #d1d5db;font-family:"Microsoft YaHei",sans-serif}.report-window-toolbar button{padding:8px 14px;border:1px solid #0f766e;border-radius:8px;background:#0f766e;color:#fff;cursor:pointer}.report-window-content{max-width:980px;margin:20px auto;padding:28px 38px;background:#fff;box-shadow:0 10px 32px rgba(15,23,42,.08)}${reportCss}@media print{body{background:#fff}.report-window-toolbar{display:none}.report-window-content{max-width:none;margin:0;padding:0;box-shadow:none}}</style></head><body><div class="report-window-toolbar"><strong>${escapeHtml(title)}</strong><button onclick="window.print()">打印 / 导出 PDF</button></div><main class="report-window-content"><article class="report-paper">${state.reportHtml}</article></main></body></html>`);
+        reportWindow.document.close();
+    }
+
+    function renderReportWindowError(reportWindow, error) {
+        if (!reportWindow || reportWindow.closed) return;
+        reportWindow.document.open();
+        reportWindow.document.write(`<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>报告生成失败</title></head><body style="font-family:Microsoft YaHei,sans-serif;padding:36px"><h2>报告生成失败</h2><p>${escapeHtml(error?.message || String(error))}</p></body></html>`);
+        reportWindow.document.close();
     }
 
     async function loadOpenAIStatus() {
@@ -820,7 +853,8 @@
 
     function enteredReportInfo() {
         return {
-            teacher: els.teacher.value.trim(),
+            theory_teacher: els.theoryTeacher.value.trim(),
+            experiment_teachers: els.experimentTeachers.value.trim(),
             student_id: els.studentId.value.trim(),
             class: els.className.value.trim(),
             name: els.studentName.value.trim(),
@@ -832,7 +866,9 @@
     function reportInfo() {
         const entered = enteredReportInfo();
         const defaults = metadataDefaults();
-        return Object.fromEntries(Object.keys(defaults).map(key => [key, entered[key] || defaults[key]]));
+        const result = Object.fromEntries(Object.keys(defaults).map(key => [key, entered[key] || defaults[key]]));
+        result.teacher = result.theory_teacher;
+        return result;
     }
 
     function saveState() {
@@ -850,7 +886,8 @@
             state.selectedId = saved.selectedId || state.selectedId;
             state.data = saved.data || {};
             const metadata = saved.metadata || {};
-            els.teacher.value = metadata.teacher || "";
+            els.theoryTeacher.value = metadata.theory_teacher || metadata.teacher || "";
+            els.experimentTeachers.value = metadata.experiment_teachers || "";
             els.studentId.value = metadata.student_id || "";
             els.className.value = metadata.class || "";
             els.studentName.value = metadata.name || "";
@@ -859,12 +896,6 @@
         } catch {
             localStorage.removeItem(storageKey);
         }
-    }
-
-    function todayIso() {
-        const now = new Date();
-        const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
-        return local.toISOString().slice(0, 10);
     }
 
     function downloadMarkdown() {
