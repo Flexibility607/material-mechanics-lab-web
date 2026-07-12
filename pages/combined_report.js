@@ -41,7 +41,7 @@
         terminal_force_kN: "压缩终止载荷 Fᵦ / kN",
         strength_diameter_mm: "强度计算采用直径 / mm",
         yield_force_kN: "屈服载荷 Fₛ / kN",
-        max_force_kN: "峰值或破坏载荷 Fᵦ / kN",
+        max_force_kN: "峰值载荷 Fₚ（低碳钢拉伸）或破坏载荷 Fᵦ / kN",
         max_torque_Nm: "最大扭矩 Tᵦ / N·m",
         twist_angle_deg: "扭转角 φ / °",
         observation: "实验现象",
@@ -471,7 +471,7 @@
             updateRefineButtons();
             setServerState("连接正常", "ok");
             showStatus("报告已生成。固定正文保持不变，数据表、计算结果和数值结论已更新。", "ok");
-            queueMathRender([els.reportPreview]);
+            await queueMathRender([els.reportPreview]);
             renderReportWindow(reportWindow, exp);
             saveState();
         } catch (error) {
@@ -502,9 +502,13 @@
     function renderReportWindow(reportWindow, exp) {
         if (!reportWindow || reportWindow.closed) return;
         const title = `${exp.id} ${exp.title}实验报告`;
+        const previewPaper = els.reportPreview.querySelector(".report-paper");
+        const formulaBlocks = previewPaper ? [...previewPaper.querySelectorAll(".report-formula")] : [];
+        const formulasReady = formulaBlocks.length > 0 && formulaBlocks.every(block => block.querySelector("mjx-container"));
+        const renderedReportHtml = previewPaper?.innerHTML || state.reportHtml;
         reportWindow.document.open();
         const reportCss = downloadStyles().replace(/^body\{[^}]*\}/, "");
-        reportWindow.document.write(`<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title><script>window.MathJax={tex:{inlineMath:[["\\(","\\)"],["$","$"]],displayMath:[["\\[","\\]"],["$$","$$"]]},svg:{fontCache:"global"}};</script><script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script><style>body{margin:0;background:#eef2f1;color:#111827}.report-window-toolbar{position:sticky;top:0;z-index:5;display:flex;justify-content:space-between;align-items:center;padding:10px 18px;background:#fff;border-bottom:1px solid #d1d5db;font-family:"Microsoft YaHei",sans-serif}.report-window-toolbar button{padding:8px 14px;border:1px solid #0f766e;border-radius:8px;background:#0f766e;color:#fff;cursor:pointer}.report-window-content{max-width:980px;margin:20px auto;padding:28px 38px;background:#fff;box-shadow:0 10px 32px rgba(15,23,42,.08)}${reportCss}@media print{body{background:#fff}.report-window-toolbar{display:none}.report-window-content{max-width:none;margin:0;padding:0;box-shadow:none}}</style></head><body><div class="report-window-toolbar"><strong>${escapeHtml(title)}</strong><button onclick="window.print()">打印 / 导出 PDF</button></div><main class="report-window-content"><article class="report-paper">${state.reportHtml}</article></main></body></html>`);
+        reportWindow.document.write(`<!DOCTYPE html><html lang="zh-CN" data-math-ready="${formulasReady ? "true" : "error"}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title><style>body{margin:0;background:#eef2f1;color:#111827}.report-window-toolbar{position:sticky;top:0;z-index:5;display:flex;justify-content:space-between;align-items:center;gap:18px;padding:10px 18px;background:#fff;border-bottom:1px solid #d1d5db;font-family:"Microsoft YaHei",sans-serif}.report-window-title{display:grid;gap:3px}.report-window-authors{color:#0f766e;font-size:12px;font-weight:700}.report-window-toolbar button{padding:8px 14px;border:1px solid #0f766e;border-radius:8px;background:#0f766e;color:#fff;cursor:pointer}.report-window-content{max-width:980px;margin:20px auto;padding:28px 38px;background:#fff;box-shadow:0 10px 32px rgba(15,23,42,.08)}.math-render-warning{margin:0;padding:9px 18px;background:#fff7ed;color:#9a3412;border-bottom:1px solid #fed7aa;font-family:"Microsoft YaHei",sans-serif;font-size:13px}${reportCss}@media print{body{background:#fff}.report-window-toolbar,.math-render-warning{display:none}.report-window-content{max-width:none;margin:0;padding:0;box-shadow:none}}</style></head><body><div class="report-window-toolbar"><div class="report-window-title"><strong>${escapeHtml(title)}</strong><span class="report-window-authors">实验报告作者：2205yrl　系统作者：2423flx · 2402wzl</span></div><button id="reportPrintButton" onclick="window.print()">打印 / 导出 PDF</button></div>${formulasReady ? "" : '<p class="math-render-warning">公式排版未完成，请返回主窗口稍候后重新生成报告。</p>'}<main class="report-window-content"><article class="report-paper">${renderedReportHtml}</article></main></body></html>`);
         reportWindow.document.close();
     }
 
@@ -622,7 +626,7 @@
             }
             const image = line.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
             if (image) {
-                output.push(`<img src="${escapeHtml(image[2])}" alt="${escapeHtml(image[1])}">`);
+                output.push(`<img src="${escapeHtml(resolveReportImageUrl(image[2]))}" alt="${escapeHtml(image[1])}">`);
                 index++;
                 continue;
             }
@@ -670,6 +674,13 @@
             output.push(`<p>${inlineMarkdown(paragraph.join(" "))}</p>`);
         }
         return output.join("\n");
+    }
+
+    function resolveReportImageUrl(source) {
+        const prefix = "/report-images/";
+        if (!window.MATERIAL_MECHANICS_STATIC_PAGES || !source.startsWith(prefix)) return source;
+        const relative = source.slice(prefix.length).split("/").map(encodeURIComponent).join("/");
+        return new URL(`engine/03-%E5%AE%9E%E9%AA%8C%E6%8A%A5%E5%91%8A/markdown/images/${relative}`, document.baseURI).href;
     }
 
     function isSpecialMarkdownLine(line) {
@@ -983,16 +994,22 @@
 
     function queueMathRender(elements) {
         const targets = elements.filter(Boolean);
-        let tries = 0;
-        const attempt = () => {
-            if (window.MathJax?.typesetPromise) {
-                window.MathJax.typesetPromise(targets).catch(() => {});
-                return;
-            }
-            tries += 1;
-            if (tries < 20) window.setTimeout(attempt, 150);
-        };
-        attempt();
+        return new Promise(resolve => {
+            let tries = 0;
+            const attempt = () => {
+                if (window.MathJax?.typesetPromise) {
+                    window.MathJax.typesetPromise(targets).then(() => resolve(true)).catch(() => resolve(false));
+                    return;
+                }
+                tries += 1;
+                if (tries < 100) {
+                    window.setTimeout(attempt, 100);
+                } else {
+                    resolve(false);
+                }
+            };
+            attempt();
+        });
     }
 
     function escapeHtml(value) {

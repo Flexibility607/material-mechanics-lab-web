@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 430" role="img" aria-labelledby="title desc">
+  <title id="title">低碳钢拉伸载荷—变形曲线</title>
+  <desc id="desc">低碳钢拉伸时先线性上升，随后屈服波动、强化达到峰值，最后缩颈下降。</desc>
+  <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#111827"/></marker></defs>
+  <rect width="760" height="430" fill="#fff"/>
+  <g fill="none" stroke="#111827" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M105 350 V55 M105 350 H690" stroke-width="3" marker-end="url(#arrow)"/>
+    <path d="M105 350 C140 278 175 205 214 142 C224 128 236 156 246 139 C256 122 267 158 278 140 C292 120 309 151 324 139 C375 104 430 80 494 72 C548 66 586 82 610 110 C632 135 647 151 664 164" stroke="#0f766e" stroke-width="5"/>
+    <path d="M105 350 L214 142" stroke="#64748b" stroke-width="1.8" stroke-dasharray="8 7"/>
+    <path d="M215 350 V142 M494 350 V72" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="7 7"/>
+  </g>
+  <g font-family="Times New Roman, SimSun, serif" fill="#111827" font-size="25">
+    <text x="72" y="58">F</text><text x="676" y="392">Δl</text>
+    <text x="160" y="382">弹性</text><text x="228" y="182">屈服</text><text x="378" y="118">强化</text><text x="558" y="64">峰值</text><text x="625" y="142">缩颈</text>
+  </g>
+</svg>

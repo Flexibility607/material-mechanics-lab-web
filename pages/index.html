@@ -4,24 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>材料力学实验报告生成器</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="combined_report.css">
+    <link rel="stylesheet" href="style.css?v=20260712-b021">
+    <link rel="stylesheet" href="combined_report.css?v=20260712-b021">
     <script>
+        window.MATERIAL_MECHANICS_STATIC_PAGES = true;
         window.MathJax = {
             tex: {
                 inlineMath: [["\\(", "\\)"], ["$", "$"]],
                 displayMath: [["\\[", "\\]"], ["$$", "$$"]],
                 processEscapes: true
             },
-            svg: { fontCache: "global" },
+            svg: { fontCache: "local" },
             startup: { typeset: false }
         };
     </script>
     <script src="https://cdn.jsdelivr.net/pyodide/v0.28.2/full/pyodide.js" defer></script>
-    <script src="static_api.js" defer></script>
+    <script src="static_api.js?v=20260712-b021" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" async></script>
-    <script src="common.js" defer></script>
-    <script src="combined_report.js" defer></script>
+    <script src="common.js?v=20260712-b021" defer></script>
+    <script src="combined_report.js?v=20260712-web-window2" defer></script>
 </head>
 <body>
     <div class="pages-notice" role="status">GitHub Pages 静态版：Python 计算在浏览器本地执行；OpenAI 润色请使用本地网站或桌面应用。</div>
@@ -32,6 +33,10 @@
                 <div>
                     <h1>材料力学实验报告生成器</h1>
                     <p>填写原始数据，自动替换数据处理与数值结论</p>
+                    <div class="author-credit" aria-label="作者信息">
+                        <span>实验报告作者：2205yrl</span>
+                        <span>系统作者：2423flx · 2402wzl</span>
+                    </div>
                 </div>
             </div>
             <div class="header-actions">

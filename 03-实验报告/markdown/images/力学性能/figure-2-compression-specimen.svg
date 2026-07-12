@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" role="img" aria-labelledby="title desc">
+  <title id="title">压缩试件示意图</title>
+  <desc id="desc">圆柱形压缩试件，标出直径 d0 和高度 h0。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8 Z" fill="#111827"/></marker>
+  </defs>
+  <rect width="640" height="360" fill="#fff"/>
+  <g fill="none" stroke="#111827" stroke-width="4" stroke-linecap="round">
+    <path d="M210 72 Q320 34 430 72 V288 Q320 326 210 288 Z" fill="#f8fafc"/>
+    <ellipse cx="320" cy="72" rx="110" ry="38" fill="#fff"/>
+    <path d="M210 288 Q320 326 430 288"/>
+    <path d="M470 72 H535 M470 288 H535 M515 72 V288" marker-start="url(#arrow)" marker-end="url(#arrow)" stroke-width="2.5"/>
+    <path d="M210 324 V345 M430 324 V345 M210 336 H430" marker-start="url(#arrow)" marker-end="url(#arrow)" stroke-width="2.5"/>
+    <path d="M320 36 V324" stroke-dasharray="12 9" stroke-width="2"/>
+  </g>
+  <g font-family="Times New Roman, SimSun, serif" fill="#111827" font-size="28">
+    <text x="542" y="190">h₀</text>
+    <text x="306" y="356">d₀</text>
+  </g>
+</svg>

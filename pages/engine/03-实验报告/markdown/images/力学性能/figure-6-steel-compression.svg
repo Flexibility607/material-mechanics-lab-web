@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 430" role="img" aria-labelledby="title desc">
+  <title id="title">低碳钢压缩曲线</title>
+  <desc id="desc">低碳钢压缩初期线性，达到屈服后出现平台并继续强化上升。</desc>
+  <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#111827"/></marker></defs>
+  <rect width="720" height="430" fill="#fff"/>
+  <g fill="none" stroke="#111827" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M110 350 V55 M110 350 H650" stroke-width="3" marker-end="url(#arrow)"/>
+    <path d="M110 350 L206 165 C220 144 230 176 242 158 C255 142 266 171 280 157 C323 128 370 116 420 105 C474 92 521 70 562 52" stroke="#0f766e" stroke-width="5"/>
+    <path d="M110 208 H206 M110 165 H206" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="7 7"/>
+  </g>
+  <g font-family="Times New Roman, SimSun, serif" fill="#111827" font-size="25">
+    <text x="76" y="58">σ</text><text x="640" y="392">ε</text><text x="61" y="216">σₚ</text><text x="61" y="174">σₛ</text><text x="220" y="195">屈服</text><text x="410" y="100">塑性变形继续增大</text>
+  </g>
+</svg>

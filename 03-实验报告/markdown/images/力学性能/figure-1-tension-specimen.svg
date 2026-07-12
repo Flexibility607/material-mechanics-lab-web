@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 300" role="img" aria-labelledby="title desc">
+  <title id="title">拉伸试件示意图</title>
+  <desc id="desc">两端夹持、中部等直径的圆形拉伸试件，标出直径 d0 和标距 l0。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8 Z" fill="#111827"/></marker>
+  </defs>
+  <rect width="900" height="300" fill="#fff"/>
+  <g fill="none" stroke="#111827" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M90 98 H220 Q250 98 272 120 H628 Q650 98 680 98 H810 V202 H680 Q650 202 628 180 H272 Q250 202 220 202 H90 Z"/>
+    <path d="M45 150 H855" stroke-dasharray="14 10" stroke-width="2"/>
+    <path d="M292 225 V260 M608 225 V260 M292 248 H608" marker-start="url(#arrow)" marker-end="url(#arrow)" stroke-width="2.5"/>
+    <path d="M450 120 V180" marker-start="url(#arrow)" marker-end="url(#arrow)" stroke-width="2.5"/>
+  </g>
+  <g font-family="Times New Roman, SimSun, serif" fill="#111827" font-size="28">
+    <text x="437" y="105">d₀</text>
+    <text x="432" y="288">l₀</text>
+  </g>
+</svg>

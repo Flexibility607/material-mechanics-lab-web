@@ -1,6 +1,8 @@
 (function () {
     "use strict";
 
+    window.MATERIAL_MECHANICS_STATIC_PAGES = true;
+
     const nativeFetch = window.fetch.bind(window);
     const engineFiles = [
         "material_mechanics_assistant/backend/server.py",

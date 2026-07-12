@@ -564,34 +564,64 @@ def markdown_table(headers: list[str], rows: list[list]) -> str:
 
 
 def mechanical_report_block(data: dict, result: dict) -> str:
-    raw_rows = []
-    for loading, rows in (("拉伸", data["tension"]), ("压缩", data["compression"]), ("扭转", data["torsion"])):
-        for row in rows:
-            raw_rows.append([
-                loading,
-                row.get("material"),
-                row.get("d0_mm"),
-                row.get("d1_mm", ""),
-                row.get("l0_mm", ""),
-                row.get("l1_mm", ""),
-                row.get("yield_force_kN", ""),
-                row.get("max_force_kN", ""),
-                row.get("max_torque_Nm", ""),
-                row.get("twist_angle_deg", ""),
-            ])
-    result_rows = []
-    for row in result["tension"]:
-        result_rows.append(["拉伸", row["material"], row["yield_strength_MPa"], row["tensile_strength_MPa"], row["elongation_pct"], row["area_reduction_pct"]])
-    for row in result["compression"]:
-        result_rows.append(["压缩", row["material"], row["yield_strength_MPa"], row["compressive_strength_MPa"], "", ""])
-    for row in result["torsion"]:
-        result_rows.append(["扭转", row["material"], "", row["torsional_strength_MPa"], "", ""])
     steel = result["tension"][0]
     steel_input = data["tension"][0]
+
     def series(value) -> list:
         if value in (None, ""):
             return []
         return value if isinstance(value, list) else [value]
+
+    def average_value(value):
+        values = series(value)
+        return None if not values else sum(float(item) for item in values) / len(values)
+
+    def strength_text(symbol: str, value) -> str:
+        return "—" if value is None else f"${symbol}={report_number(value, 2)}\\ \\mathrm{{MPa}}$"
+
+    result_rows = []
+    for item, source_row in zip(result["tension"], data["tension"]):
+        material = item["material"]
+        strength = "；".join(part for part in (
+            strength_text("\\sigma_s", item["yield_strength_MPa"]),
+            strength_text("\\sigma_b", item["tensile_strength_MPa"]),
+        ) if part != "—") or "—"
+        plasticity = "；".join(part for part in (
+            "—" if item["elongation_pct"] is None else f"$\\delta={report_number(item['elongation_pct'], 2)}\\%$",
+            "—" if item["area_reduction_pct"] is None else f"$\\psi={report_number(item['area_reduction_pct'], 2)}\\%$",
+        ) if part != "—") or "—"
+        result_rows.append([
+            "拉伸", material, "断裂",
+            source_row.get("observation") or (
+                "有明显屈服、强化和缩颈，断口呈杯形" if material == "低碳钢"
+                else "变形小，无明显屈服和缩颈，断口近似垂直轴线"
+            ),
+            strength, plasticity,
+        ])
+    for item, source_row in zip(result["compression"], data["compression"]):
+        material = item["material"]
+        strength = strength_text("\\sigma_s", item["yield_strength_MPa"])
+        if strength == "—":
+            strength = strength_text("\\sigma_b", item["compressive_strength_MPa"])
+        result_rows.append([
+            "压缩", material, "大塑性变形" if material == "低碳钢" else "断裂",
+            source_row.get("observation") or (
+                "屈服后塑性变形迅速增大，试件呈腰鼓形" if material == "低碳钢"
+                else "无明显屈服，断口与轴线约成55°"
+            ),
+            strength, "—",
+        ])
+    for item, source_row in zip(result["torsion"], data["torsion"]):
+        angle = item.get("twist_angle_deg")
+        result_rows.append([
+            "扭转", item["material"], "断裂",
+            source_row.get("observation") or (
+                "塑性转角很大，断口垂直于轴线" if item["material"] == "低碳钢"
+                else "变形小，沿与轴线约成45°的螺旋面断裂"
+            ),
+            strength_text("\\tau_b", item["torsional_strength_MPa"]),
+            "—" if angle is None else f"$\\varphi={report_number(angle, 2)}^\\circ$",
+        ])
 
     diameter_values = series(steel_input.get("d0_measurements_mm"))
     diameter_rows = []
@@ -604,6 +634,81 @@ def mechanical_report_block(data: dict, result: dict) -> str:
     l0_values = series(steel_input.get("l0_mm"))
     d1_values = series(steel_input.get("d1_mm"))
     l1_values = series(steel_input.get("l1_mm"))
+    yield_load = average_value(steel_input.get("yield_force_kN"))
+    peak_load = average_value(steel_input.get("max_force_kN"))
+    d0 = steel["d0_mm"]
+    d1 = steel["d1_mm"]
+    l0 = steel["l0_mm"]
+    l1 = steel["l1_mm"]
+    area0_m2 = steel["A0_mm2"] * 1e-6
+    area1_m2 = None if d1 is None else math.pi * d1**2 / 4.0 * 1e-6
+    calculation_parts = [
+        "### 2. 低碳钢拉伸数据处理",
+        "初始截面积：",
+        (
+            "$$\n"
+            "A_0=\\frac{\\pi d_0^2}{4}"
+            f"=\\frac{{\\pi({report_number(d0, 2)}\\times10^{{-3}})^2}}{{4}}"
+            f"={report_number(area0_m2 * 1e6, 4)}\\times10^{{-6}}\\ \\mathrm{{m^2}}。\n"
+            "$$"
+        ),
+    ]
+    if area1_m2 is not None:
+        calculation_parts.extend([
+            "断后最小截面积：",
+            (
+                "$$\n"
+                "A_1=\\frac{\\pi d_1^2}{4}"
+                f"=\\frac{{\\pi({report_number(d1, 2)}\\times10^{{-3}})^2}}{{4}}"
+                f"={report_number(area1_m2 * 1e6, 4)}\\times10^{{-6}}\\ \\mathrm{{m^2}}。\n"
+                "$$"
+            ),
+        ])
+    if yield_load is not None and steel["yield_strength_MPa"] is not None:
+        calculation_parts.extend([
+            "屈服极限：",
+            (
+                "$$\n"
+                "\\sigma_s=\\frac{F_s}{A_0}"
+                f"=\\frac{{{report_number(yield_load, 3)}\\times10^3}}{{{report_number(area0_m2 * 1e6, 4)}\\times10^{{-6}}}}"
+                f"={report_number(steel['yield_strength_MPa'], 2)}\\ \\mathrm{{MPa}}。\n"
+                "$$"
+            ),
+        ])
+    if peak_load is not None and steel["tensile_strength_MPa"] is not None:
+        calculation_parts.extend([
+            "强度极限：",
+            (
+                "$$\n"
+                "\\sigma_b=\\frac{F_p}{A_0}"
+                f"=\\frac{{{report_number(peak_load, 3)}\\times10^3}}{{{report_number(area0_m2 * 1e6, 4)}\\times10^{{-6}}}}"
+                f"={report_number(steel['tensile_strength_MPa'], 2)}\\ \\mathrm{{MPa}}。\n"
+                "$$"
+            ),
+        ])
+    if l0 is not None and l1 is not None and steel["elongation_pct"] is not None:
+        calculation_parts.extend([
+            "延伸率：",
+            (
+                "$$\n"
+                "\\delta=\\frac{l_1-l_0}{l_0}\\times100\\%"
+                f"=\\frac{{{report_number(l1, 2)}-{report_number(l0, 2)}}}{{{report_number(l0, 2)}}}\\times100\\%"
+                f"={report_number(steel['elongation_pct'], 2)}\\%。\n"
+                "$$"
+            ),
+        ])
+    if d1 is not None and steel["area_reduction_pct"] is not None:
+        calculation_parts.extend([
+            "断面收缩率：",
+            (
+                "$$\n"
+                "\\psi=\\left|\\frac{A_0-A_1}{A_0}\\right|\\times100\\%"
+                "=\\left|\\frac{d_0^2-d_1^2}{d_0^2}\\right|\\times100\\%"
+                f"=\\left|\\frac{{{report_number(d0, 2)}^2-{report_number(d1, 2)}^2}}{{{report_number(d0, 2)}^2}}\\right|\\times100\\%"
+                f"={report_number(steel['area_reduction_pct'], 2)}\\%。\n"
+                "$$"
+            ),
+        ])
     compatibility_notes = []
     for row in result["compression"]:
         if row.get("strength_diameter_mm") is not None and row.get("compressive_strength_initial_area_MPa") is not None:
@@ -623,17 +728,21 @@ def mechanical_report_block(data: dict, result: dict) -> str:
         markdown_table(["断裂直径/mm", "1", "2", "3", "平均"], [["测量值", *d1_values, steel["d1_mm"]]]),
         "#### 断裂标距",
         markdown_table(["断裂标距/mm", "1", "2", "3", "平均"], [["测量值", *l1_values, steel["l1_mm"]]]),
-        markdown_table(["加载", "材料", "$d_0$/mm", "$d_1$/mm", "$l_0$/mm", "$l_1$/mm", "$F_s$/kN", "$F_b$/kN", "$T_b$/(N·m)", "$\\varphi$/(°)"], raw_rows),
-        "### 2. 低碳钢拉伸数据处理",
-        (
-            f"由原始截面和断后尺寸计算低碳钢的强度与塑性指标："
-            f"$\\sigma_s={report_number(steel['yield_strength_MPa'], 2)}\\ \\mathrm{{MPa}}$，"
-            f"$\\sigma_b={report_number(steel['tensile_strength_MPa'], 2)}\\ \\mathrm{{MPa}}$，"
-            f"$\\delta={report_number(steel['elongation_pct'], 2)}\\%$，"
-            f"$\\psi={report_number(steel['area_reduction_pct'], 2)}\\%$。"
+        "下表为**低碳钢轴向拉伸实验**由试验机载荷—变形曲线读取的特征载荷；$F_s$ 为屈服载荷，$F_p$ 为峰值载荷。",
+        markdown_table(
+            ["实验", "特征量", "符号", "实测值/kN"],
+            [
+                ["低碳钢轴向拉伸实验", "屈服载荷", "$F_s$", yield_load],
+                ["低碳钢轴向拉伸实验", "峰值载荷", "$F_p$", peak_load],
+            ],
         ),
+        *calculation_parts,
         "### 3. 各材料与加载方式结果汇总",
-        markdown_table(["加载", "材料", "屈服强度/MPa", "强度/MPa", "延伸率/%", "断面收缩率/%"], result_rows),
+        markdown_table(["加载方式", "材料", "失效形式", "典型现象", "强度指标", "塑性指标"], result_rows),
+        "拉伸对比：低碳钢有明显屈服、强化和缩颈，断后塑性指标较大；铸铁无明显屈服和缩颈，变形很小时即沿近似垂直轴线的截面脆断。",
+        "压缩对比：低碳钢屈服后产生很大的塑性变形并形成腰鼓形，一般不发生断裂；铸铁沿约 $55^\\circ$ 斜面断裂，压缩承载能力明显高于拉伸。",
+        "扭转对比：低碳钢扭转角很大，最终沿垂直轴线的横截面剪断；铸铁扭转角较小，沿与轴线约成 $45^\\circ$ 的螺旋面脆断。",
+        "综上，低碳钢属于塑性材料，在三种加载方式下均表现出较明显的塑性变形；铸铁属于脆性材料，破坏前变形较小，通常无明显屈服阶段。两类材料的断口方向与相应截面上的主导应力状态相符。",
         *compatibility_notes,
         "## 六、实验结论",
         (

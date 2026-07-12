@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 430" role="img" aria-labelledby="title desc">
+  <title id="title">铸铁拉伸曲线</title>
+  <desc id="desc">铸铁拉伸应力随应变非线性上升，在较小应变下突然断裂，无明显屈服和缩颈。</desc>
+  <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#111827"/></marker></defs>
+  <rect width="720" height="430" fill="#fff"/>
+  <g fill="none" stroke="#111827" stroke-linecap="round">
+    <path d="M110 350 V55 M110 350 H650" stroke-width="3" marker-end="url(#arrow)"/>
+    <path d="M110 350 C150 289 193 224 242 169 C284 121 332 86 392 72" stroke="#0f766e" stroke-width="5"/>
+    <circle cx="392" cy="72" r="7" fill="#0f766e"/>
+    <path d="M392 72 V350" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="7 7"/>
+  </g>
+  <g font-family="Times New Roman, SimSun, serif" fill="#111827" font-size="25">
+    <text x="76" y="58">σ</text><text x="640" y="392">ε</text><text x="410" y="76">断裂</text><text x="178" y="388">变形小，无明显屈服与缩颈</text>
+  </g>
+</svg>

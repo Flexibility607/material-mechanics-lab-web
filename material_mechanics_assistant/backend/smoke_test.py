@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import re
 from pathlib import Path
 
 from server import (
@@ -49,7 +50,7 @@ def main():
         ):
             if expected not in report:
                 raise AssertionError(f"{exp['id']} 自动报告缺少：{expected}")
-        if "<details>" in report or "images/" in report or "/report-images/" in report:
+        if "<details>" in report or re.search(r"/report-images/[^)]+/page-\d+\.png", report):
             raise AssertionError(f"{exp['id']} 自动报告仍包含原始记录页图片")
         print(f"{exp['id']} REPORT OK markdown={len(payload['report_markdown'])}")
 
