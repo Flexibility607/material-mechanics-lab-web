@@ -49,8 +49,6 @@
         width_mm: "宽度测量值 / mm",
         thickness_mm: "厚度测量值 / mm",
         height_mm: "高度测量值 / mm",
-        axial_channels: "轴向应变通道索引",
-        transverse_channels: "横向应变通道索引",
         runs: "重复加载",
         loads_kN: "载荷序列 / kN",
         readings_micro: "应变读数 / 10⁻⁶",
@@ -114,8 +112,6 @@
     };
 
     const help = {
-        axial_channels: "通道从 0 开始编号。本报告轴向为第 1、4 通道，因此填写 0, 3。",
-        transverse_channels: "本报告横向为第 2、3 通道，因此填写 1, 2。",
         display_factor: "仪器显示值除以该系数得到实际应变；半桥通常为 2，全桥弯曲通常为 4。",
         reading_to_gamma_factor: "半桥读数已是 γ 时填 1；全桥显示为 2γ 时填 0.5。",
         readings_micro: "矩阵每行对应一个加载级，行内各数对应应变通道。"
@@ -181,6 +177,7 @@
         state.catalog.experiments.forEach(exp => {
             if (!state.data[exp.key]) state.data[exp.key] = clone(sample[exp.key]);
         });
+        removeLegacyElasticChannelSelectors();
         const ids = state.catalog.experiments.map(exp => exp.id);
         if (!ids.includes(state.selectedId)) state.selectedId = ids[0];
         configureMetadataDefaults();
@@ -239,8 +236,12 @@
 
     function renderCurrentForm() {
         const exp = currentExperiment();
+        removeLegacyElasticChannelSelectors();
         const data = state.data[exp.key];
         els.rawDataTitle.textContent = `${exp.id} ${exp.title}原始数据`;
+        els.rawDataHint.textContent = exp.id === "B031"
+            ? "只需输入四个通道读数；系统会按全程数值相近程度自动两两配对并识别轴向、横向应变"
+            : "数列与矩阵可在表格中逐项增删，也可通过 CSV 批量编辑";
         els.rawInputForm.innerHTML = renderObject(data, [], exp.title, 0);
         els.rawInputForm.querySelectorAll("[data-input-path]").forEach(input => {
             input.addEventListener("input", handleDataInput);
@@ -249,6 +250,13 @@
         els.rawInputForm.querySelectorAll("[data-array-action]").forEach(button => {
             button.addEventListener("click", handleArrayAction);
         });
+    }
+
+    function removeLegacyElasticChannelSelectors() {
+        const elastic = state.data.elastic_constants;
+        if (!elastic || typeof elastic !== "object") return;
+        delete elastic.axial_channels;
+        delete elastic.transverse_channels;
     }
 
     function renderObject(object, path, title, depth) {

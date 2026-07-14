@@ -152,6 +152,60 @@ def calculate_mechanical_properties(data: dict[str, Any]) -> dict[str, Any]:
     return results
 
 
+def detect_elastic_channel_pairs(runs: list[dict[str, Any]]) -> dict[str, Any]:
+    """Pair four strain channels by similarity, then identify axial/transverse pairs."""
+    traces: list[list[float]] = [[] for _ in range(4)]
+    for run_index, run in enumerate(runs):
+        readings = require(run, "readings_micro", f"elastic_constants.runs[{run_index}]")
+        parsed_rows = [numbers(row) for row in readings]
+        if not parsed_rows:
+            raise InputError(f"elastic_constants.runs[{run_index}].readings_micro 不能为空")
+        if any(len(row) != 4 for row in parsed_rows):
+            raise InputError(
+                f"elastic_constants.runs[{run_index}].readings_micro 每个加载级必须输入 4 个通道"
+            )
+        baseline = parsed_rows[0]
+        for row in parsed_rows[1:]:
+            for channel in range(4):
+                traces[channel].append(row[channel] - baseline[channel])
+
+    pairings = (
+        ((0, 1), (2, 3)),
+        ((0, 2), (1, 3)),
+        ((0, 3), (1, 2)),
+    )
+
+    def pairing_error(pairing: tuple[tuple[int, int], tuple[int, int]]) -> float:
+        return sum(
+            (left - right) ** 2
+            for pair in pairing
+            for left, right in zip(traces[pair[0]], traces[pair[1]])
+        )
+
+    selected_pairs = min(pairings, key=pairing_error)
+
+    def pair_magnitude(pair: tuple[int, int]) -> float:
+        combined = [
+            (left + right) / 2.0
+            for left, right in zip(traces[pair[0]], traces[pair[1]])
+        ]
+        return mean(abs(value) for value in combined) if combined else 0.0
+
+    first_magnitude = pair_magnitude(selected_pairs[0])
+    second_magnitude = pair_magnitude(selected_pairs[1])
+    if first_magnitude >= second_magnitude:
+        axial_channels, transverse_channels = selected_pairs
+    else:
+        transverse_channels, axial_channels = selected_pairs
+
+    sample_count = max(sum(len(traces[channel]) for channel in range(4)) // 2, 1)
+    return {
+        "axial_channels": list(axial_channels),
+        "transverse_channels": list(transverse_channels),
+        "pairing_rmse_micro": math.sqrt(pairing_error(selected_pairs) / sample_count),
+    }
+
+
 def calculate_elastic_constants(data: dict[str, Any]) -> dict[str, Any]:
     width = average(require(data, "width_mm", "elastic_constants"), "elastic_constants.width_mm")
     thickness = average(
@@ -159,17 +213,21 @@ def calculate_elastic_constants(data: dict[str, Any]) -> dict[str, Any]:
         "elastic_constants.thickness_mm",
     )
     area = width * thickness
-    axial_channels = [int(i) for i in data.get("axial_channels", [0, 1])]
-    transverse_channels = [int(i) for i in data.get("transverse_channels", [2, 3])]
     runs = require(data, "runs", "elastic_constants")
+    channel_pairing = detect_elastic_channel_pairs(runs)
+    axial_channels = channel_pairing["axial_channels"]
+    transverse_channels = channel_pairing["transverse_channels"]
     interval_groups: dict[int, list[dict[str, float]]] = {}
     curve_groups: dict[int, list[dict[str, float]]] = {}
 
     for run_index, run in enumerate(runs):
         loads = numbers(require(run, "loads_kN", f"elastic_constants.runs[{run_index}]"))
         readings = require(run, "readings_micro", f"elastic_constants.runs[{run_index}]")
-        if len(loads) != len(readings) or len(loads) < 2:
-            raise InputError(f"elastic_constants.runs[{run_index}] 载荷与读数长度必须相同且不少于 2")
+        if len(loads) != len(readings) or len(loads) < 3:
+            raise InputError(
+                f"elastic_constants.runs[{run_index}] 载荷与读数长度必须相同且不少于 3，"
+                "以便完成应力—应变直线拟合"
+            )
         axial: list[float] = []
         transverse: list[float] = []
         for level, row in enumerate(readings):
@@ -212,23 +270,31 @@ def calculate_elastic_constants(data: dict[str, Any]) -> dict[str, Any]:
 
     strain_curve: list[float] = []
     stress_curve: list[float] = []
-    first_load = mean(item["load_kN"] for item in curve_groups[min(curve_groups)])
+    stress_strain_curve: list[dict[str, float]] = []
     for level in sorted(curve_groups):
         if level == min(curve_groups):
             continue
         row_group = curve_groups[level]
         load = mean(item["load_kN"] for item in row_group)
         axial_micro = mean(item["axial_micro"] for item in row_group)
+        stress_MPa = load * 1000.0 / area
         strain_curve.append(axial_micro * 1e-6)
-        stress_curve.append((load - first_load) * 1000.0 / area)
+        stress_curve.append(stress_MPa)
+        stress_strain_curve.append({
+            "load_kN": load,
+            "strain_micro": axial_micro,
+            "stress_MPa": stress_MPa,
+        })
     fit = linear_fit(strain_curve, stress_curve)
     return {
         "width_mm": width,
         "thickness_mm": thickness,
         "area_mm2": area,
+        "channel_pairing": channel_pairing,
         "intervals": interval_results,
         "E_mean_MPa": mean(row["E_MPa"] for row in interval_results),
         "mu_mean": mean(row["mu"] for row in interval_results),
+        "stress_strain_curve": stress_strain_curve,
         "stress_strain_fit": fit,
     }
 
@@ -285,12 +351,22 @@ def calculate_shear_modulus(data: dict[str, Any]) -> dict[str, Any]:
         values = _increment_moduli(tau, gamma, 1.0)
         report_delta_tau = _report_difference_increment(tau)
         report_delta_gamma = _report_difference_increment(gamma)
+        report_delta_gamma_1 = _report_difference_increment(
+            [value * gamma_factor * 1e-6 for value in ch1]
+        )
+        report_delta_gamma_2 = _report_difference_increment(
+            [value * gamma_factor * 1e-6 for value in ch2]
+        )
         report_G = report_delta_tau / report_delta_gamma
         electric_G.extend(values)
         electric_runs.append({
             "run": run_index + 1,
             "G_increment_MPa": values,
             "G_mean_MPa": mean(values),
+            "gamma_micro": [value * 1e6 for value in gamma],
+            "tau_MPa": tau,
+            "report_delta_gamma_1_micro": report_delta_gamma_1 * 1e6,
+            "report_delta_gamma_2_micro": report_delta_gamma_2 * 1e6,
             "report_delta_gamma_micro": report_delta_gamma * 1e6,
             "G_report_MPa": report_G,
             "fit_tau_vs_gamma": linear_fit(gamma, tau),

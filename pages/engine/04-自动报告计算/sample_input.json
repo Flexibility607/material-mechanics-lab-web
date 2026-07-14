@@ -77,8 +77,6 @@
       "material": "7075铝合金",
       "width_mm": [24.42, 24.46, 24.41],
       "thickness_mm": [8.03, 7.99, 8.04],
-      "axial_channels": [0, 3],
-      "transverse_channels": [1, 2],
       "runs": [
         {
           "loads_kN": [2, 6, 10, 14, 18],

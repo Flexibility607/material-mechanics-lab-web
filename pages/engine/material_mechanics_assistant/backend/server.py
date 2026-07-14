@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import csv
 import importlib.util
 import io
@@ -563,6 +564,126 @@ def markdown_table(headers: list[str], rows: list[list]) -> str:
     return "\n".join(lines)
 
 
+def _nice_chart_axis(value: float, tick_count: int = 5) -> tuple[float, float]:
+    if value <= 0:
+        return 1.0, 0.2
+    rough_step = value / tick_count
+    magnitude = 10 ** math.floor(math.log10(rough_step))
+    normalized = rough_step / magnitude
+    if normalized <= 1:
+        nice = 1
+    elif normalized <= 2:
+        nice = 2
+    elif normalized <= 5:
+        nice = 5
+    else:
+        nice = 10
+    step = nice * magnitude
+    return math.ceil(value / step) * step, step
+
+
+def elastic_stress_strain_chart(result: dict) -> str:
+    points = result["stress_strain_curve"]
+    fit = result["stress_strain_fit"]
+    width, height = 760, 460
+    left, right, top, bottom = 86, 724, 66, 382
+    plot_width, plot_height = right - left, bottom - top
+    x_max, x_step = _nice_chart_axis(max(item["strain_micro"] for item in points) * 1.05)
+    y_max, y_step = _nice_chart_axis(max(item["stress_MPa"] for item in points) * 1.08)
+
+    def x_position(value: float) -> float:
+        return left + value / x_max * plot_width
+
+    def y_position(value: float) -> float:
+        return bottom - value / y_max * plot_height
+
+    svg = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" role="img" aria-labelledby="title desc">',
+        '<title id="title">正应力—正应变直线拟合图</title>',
+        '<desc id="desc">横轴为正应变，纵轴为正应力，包含实验点和最小二乘拟合直线。</desc>',
+        '<rect width="760" height="460" fill="#ffffff"/>',
+        '<text x="380" y="30" text-anchor="middle" font-family="Microsoft YaHei, SimSun, sans-serif" font-size="19" font-weight="700" fill="#172033">正应力—正应变直线拟合</text>',
+        f'<clipPath id="plot-clip"><rect x="{left}" y="{top}" width="{plot_width}" height="{plot_height}"/></clipPath>',
+    ]
+    x_tick_count = int(round(x_max / x_step))
+    y_tick_count = int(round(y_max / y_step))
+    for index in range(x_tick_count + 1):
+        value = index * x_step
+        x = x_position(value)
+        svg.extend([
+            f'<line x1="{x:.2f}" y1="{top}" x2="{x:.2f}" y2="{bottom}" stroke="#dce4e8" stroke-width="1"/>',
+            f'<line x1="{x:.2f}" y1="{bottom}" x2="{x:.2f}" y2="{bottom + 6}" stroke="#354052" stroke-width="1.4"/>',
+            f'<text x="{x:.2f}" y="{bottom + 24}" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#354052">{report_number(value, 0)}</text>',
+        ])
+    for index in range(y_tick_count + 1):
+        value = index * y_step
+        y = y_position(value)
+        svg.extend([
+            f'<line x1="{left}" y1="{y:.2f}" x2="{right}" y2="{y:.2f}" stroke="#dce4e8" stroke-width="1"/>',
+            f'<line x1="{left - 6}" y1="{y:.2f}" x2="{left}" y2="{y:.2f}" stroke="#354052" stroke-width="1.4"/>',
+            f'<text x="{left - 12}" y="{y + 4:.2f}" text-anchor="end" font-family="Arial, sans-serif" font-size="12" fill="#354052">{report_number(value, 0)}</text>',
+        ])
+    svg.extend([
+        f'<line x1="{left}" y1="{bottom}" x2="{right}" y2="{bottom}" stroke="#172033" stroke-width="2"/>',
+        f'<line x1="{left}" y1="{bottom}" x2="{left}" y2="{top}" stroke="#172033" stroke-width="2"/>',
+        f'<text x="{(left + right) / 2:.2f}" y="438" text-anchor="middle" font-family="Microsoft YaHei, SimSun, sans-serif" font-size="14" fill="#172033">正应变 ε / 10⁻⁶</text>',
+        f'<text x="23" y="{(top + bottom) / 2:.2f}" text-anchor="middle" transform="rotate(-90 23 {(top + bottom) / 2:.2f})" font-family="Microsoft YaHei, SimSun, sans-serif" font-size="14" fill="#172033">正应力 σ / MPa</text>',
+    ])
+    slope = fit["slope"]
+    intercept = fit["intercept"]
+    fit_y_start = intercept
+    fit_y_end = slope * x_max * 1e-6 + intercept
+    svg.append(
+        f'<line x1="{x_position(0):.2f}" y1="{y_position(fit_y_start):.2f}" x2="{x_position(x_max):.2f}" y2="{y_position(fit_y_end):.2f}" '
+        'stroke="#0f766e" stroke-width="3" clip-path="url(#plot-clip)"/>'
+    )
+    for point in points:
+        x = x_position(point["strain_micro"])
+        y = y_position(point["stress_MPa"])
+        svg.append(
+            f'<circle cx="{x:.2f}" cy="{y:.2f}" r="5.5" fill="#d97706" stroke="#ffffff" stroke-width="2">'
+            f'<title>ε={point["strain_micro"]:.2f}×10⁻⁶，σ={point["stress_MPa"]:.2f} MPa</title></circle>'
+        )
+    equation = (
+        f'σ = {slope / 1e6:.5f}ε + {intercept:.2f}，R² = {fit["r2"]:.6f}'
+    )
+    svg.extend([
+        f'<rect x="{left + 14}" y="{top + 13}" width="312" height="58" rx="6" fill="#ffffff" fill-opacity="0.92" stroke="#cbd5dc"/>',
+        f'<text x="{left + 28}" y="{top + 36}" font-family="Microsoft YaHei, SimSun, sans-serif" font-size="13" fill="#172033">{equation}</text>',
+        f'<line x1="{left + 28}" y1="{top + 55}" x2="{left + 58}" y2="{top + 55}" stroke="#0f766e" stroke-width="3"/>',
+        f'<text x="{left + 66}" y="{top + 59}" font-family="Microsoft YaHei, SimSun, sans-serif" font-size="12" fill="#354052">拟合直线</text>',
+        f'<circle cx="{left + 157}" cy="{top + 55}" r="4.5" fill="#d97706"/>',
+        f'<text x="{left + 168}" y="{top + 59}" font-family="Microsoft YaHei, SimSun, sans-serif" font-size="12" fill="#354052">实验点</text>',
+        '</svg>',
+    ])
+    encoded = base64.b64encode("".join(svg).encode("utf-8")).decode("ascii")
+    return f"data:image/svg+xml;base64,{encoded}"
+
+
+def elastic_hooke_section(result: dict) -> str:
+    curve = result["stress_strain_curve"]
+    fit = result["stress_strain_fit"]
+    stress_strain_table = markdown_table(
+        ["正应力 $\\sigma$/MPa", *[report_number(item["stress_MPa"], 2) for item in curve]],
+        [["正应变 $\\varepsilon/10^{-6}$", *[report_number(item["strain_micro"], 2) for item in curve]]],
+    )
+    chart = elastic_stress_strain_chart(result)
+    return "\n\n".join([
+        "### 3. 正应力—正应变关系与胡克定律验证",
+        "由 $\\sigma_i=F_i/A$ 计算各级正应力，并以三次加载的轴向正应变平均值作图。",
+        stress_strain_table,
+        f"![正应力—正应变直线拟合图]({chart})",
+        (
+            f"线性拟合为 $\\sigma/\\mathrm{{MPa}}="
+            f"{report_number(fit['slope'] / 1e6, 5)}(\\varepsilon/10^{{-6}})"
+            f"{fit['intercept']:+.2f}$，拟合斜率对应的弹性模量为 "
+            f"${report_number(fit['slope'] / 1000.0, 3)}\\ \\mathrm{{GPa}}$，"
+            f"$R^2={report_number(fit['r2'], 6)}$。各点与拟合直线基本重合，"
+            "说明本次加载范围内正应力与正应变近似呈线性关系，实验结果支持单向受力胡克定律。"
+        ),
+    ])
+
+
 def mechanical_report_block(data: dict, result: dict) -> str:
     steel = result["tension"][0]
     steel_input = data["tension"][0]
@@ -765,6 +886,9 @@ def elastic_report_block(data: dict, result: dict) -> str:
         item["delta_axial_micro"], item["delta_transverse_micro"],
         item["E_MPa"] / 1000.0, item["mu"],
     ] for item in result["intervals"]]
+    pairing = result["channel_pairing"]
+    axial_channels = "、".join(str(index + 1) for index in pairing["axial_channels"])
+    transverse_channels = "、".join(str(index + 1) for index in pairing["transverse_channels"])
     return "\n\n".join([
         "## 五、实验数据记录与数据处理",
         "### 1. 原始数据",
@@ -775,7 +899,12 @@ def elastic_report_block(data: dict, result: dict) -> str:
         ),
         markdown_table(["重复组", "$F$/kN", "$\\varepsilon_1$", "$\\varepsilon_2$", "$\\varepsilon_3$", "$\\varepsilon_4$"], raw_rows),
         "### 2. 数据处理",
+        (
+            "程序按完整加载序列中四个通道的相近程度自动两两配对："
+            f"第 {axial_channels} 通道识别为轴向正应变，第 {transverse_channels} 通道识别为横向正应变。"
+        ),
         markdown_table(["增量段", "$\\Delta F$/kN", "$\\Delta\\varepsilon/10^{-6}$", "$\\Delta\\varepsilon'/10^{-6}$", "$E_i$/GPa", "$\\mu_i$"], interval_rows),
+        elastic_hooke_section(result),
         "## 六、实验结论",
         (
             f"由全部重复加载的原始通道读数得到 $E={report_number(result['E_mean_MPa'] / 1000.0, 3)}\\ \\mathrm{{GPa}}$，"
@@ -783,6 +912,76 @@ def elastic_report_block(data: dict, result: dict) -> str:
             f"$R^2={report_number(result['stress_strain_fit']['r2'], 6)}$，实验结果支持单向受力胡克定律。"
         ),
     ])
+
+
+def shear_stress_strain_chart(selected_result: dict) -> str:
+    gamma_values = selected_result["gamma_micro"]
+    tau_values = selected_result["tau_MPa"]
+    fit = selected_result["fit_tau_vs_gamma"]
+    width, height = 760, 460
+    left, right, top, bottom = 86, 724, 66, 382
+    plot_width, plot_height = right - left, bottom - top
+    x_max, x_step = _nice_chart_axis(max(gamma_values) * 1.06)
+    y_max, y_step = _nice_chart_axis(max(tau_values) * 1.08)
+
+    def x_position(value: float) -> float:
+        return left + value / x_max * plot_width
+
+    def y_position(value: float) -> float:
+        return bottom - value / y_max * plot_height
+
+    svg = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" role="img" aria-labelledby="title desc">',
+        '<title id="title">切应力—切应变直线拟合图</title>',
+        '<desc id="desc">横轴为切应变，纵轴为切应力，包含半桥实验点和最小二乘拟合直线。</desc>',
+        '<rect width="760" height="460" fill="#ffffff"/>',
+        '<text x="380" y="30" text-anchor="middle" font-family="Microsoft YaHei, SimSun, sans-serif" font-size="19" font-weight="700" fill="#172033">切应力—切应变直线拟合</text>',
+        f'<clipPath id="shear-plot-clip"><rect x="{left}" y="{top}" width="{plot_width}" height="{plot_height}"/></clipPath>',
+    ]
+    for index in range(int(round(x_max / x_step)) + 1):
+        value = index * x_step
+        x = x_position(value)
+        svg.extend([
+            f'<line x1="{x:.2f}" y1="{top}" x2="{x:.2f}" y2="{bottom}" stroke="#dce4e8" stroke-width="1"/>',
+            f'<text x="{x:.2f}" y="{bottom + 24}" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#354052">{report_number(value, 0)}</text>',
+        ])
+    for index in range(int(round(y_max / y_step)) + 1):
+        value = index * y_step
+        y = y_position(value)
+        svg.extend([
+            f'<line x1="{left}" y1="{y:.2f}" x2="{right}" y2="{y:.2f}" stroke="#dce4e8" stroke-width="1"/>',
+            f'<text x="{left - 12}" y="{y + 4:.2f}" text-anchor="end" font-family="Arial, sans-serif" font-size="12" fill="#354052">{report_number(value, 0)}</text>',
+        ])
+    svg.extend([
+        f'<line x1="{left}" y1="{bottom}" x2="{right}" y2="{bottom}" stroke="#172033" stroke-width="2"/>',
+        f'<line x1="{left}" y1="{bottom}" x2="{left}" y2="{top}" stroke="#172033" stroke-width="2"/>',
+        f'<text x="{(left + right) / 2:.2f}" y="438" text-anchor="middle" font-family="Microsoft YaHei, SimSun, sans-serif" font-size="14" fill="#172033">切应变 γ / 10⁻⁶</text>',
+        f'<text x="23" y="{(top + bottom) / 2:.2f}" text-anchor="middle" transform="rotate(-90 23 {(top + bottom) / 2:.2f})" font-family="Microsoft YaHei, SimSun, sans-serif" font-size="14" fill="#172033">切应力 τ / MPa</text>',
+    ])
+    slope = fit["slope"]
+    intercept = fit["intercept"]
+    fit_y_end = slope * x_max * 1e-6 + intercept
+    svg.append(
+        f'<line x1="{x_position(0):.2f}" y1="{y_position(intercept):.2f}" x2="{x_position(x_max):.2f}" y2="{y_position(fit_y_end):.2f}" '
+        'stroke="#0f766e" stroke-width="3" clip-path="url(#shear-plot-clip)"/>'
+    )
+    for gamma, tau in zip(gamma_values, tau_values):
+        svg.append(
+            f'<circle cx="{x_position(gamma):.2f}" cy="{y_position(tau):.2f}" r="5.5" fill="#d97706" stroke="#ffffff" stroke-width="2">'
+            f'<title>γ={gamma:.2f}×10⁻⁶，τ={tau:.2f} MPa</title></circle>'
+        )
+    equation = f'τ = {slope / 1e6:.5f}γ {intercept:+.2f}，R² = {fit["r2"]:.6f}'
+    svg.extend([
+        f'<rect x="{left + 14}" y="{top + 13}" width="318" height="58" rx="6" fill="#ffffff" fill-opacity="0.92" stroke="#cbd5dc"/>',
+        f'<text x="{left + 28}" y="{top + 36}" font-family="Microsoft YaHei, SimSun, sans-serif" font-size="13" fill="#172033">{equation}</text>',
+        f'<line x1="{left + 28}" y1="{top + 55}" x2="{left + 58}" y2="{top + 55}" stroke="#0f766e" stroke-width="3"/>',
+        f'<text x="{left + 66}" y="{top + 59}" font-family="Microsoft YaHei, SimSun, sans-serif" font-size="12" fill="#354052">拟合直线</text>',
+        f'<circle cx="{left + 157}" cy="{top + 55}" r="4.5" fill="#d97706"/>',
+        f'<text x="{left + 168}" y="{top + 59}" font-family="Microsoft YaHei, SimSun, sans-serif" font-size="12" fill="#354052">实验点</text>',
+        '</svg>',
+    ])
+    encoded = base64.b64encode("".join(svg).encode("utf-8")).decode("ascii")
+    return f"data:image/svg+xml;base64,{encoded}"
 
 
 def shear_report_block(data: dict, result: dict) -> str:
@@ -793,14 +992,8 @@ def shear_report_block(data: dict, result: dict) -> str:
     gauge_length = float(data["gauge_length_mm"] if not isinstance(data["gauge_length_mm"], list) else sum(data["gauge_length_mm"]) / len(data["gauge_length_mm"]))
     dial_arm = float(data["dial_arm_mm"] if not isinstance(data["dial_arm_mm"], list) else sum(data["dial_arm_mm"]) / len(data["dial_arm_mm"]))
     diameters = data["diameter_mm"] if isinstance(data["diameter_mm"], list) else [data["diameter_mm"]]
-    dial_rows = [
-        ["$F$/kN", *loads],
-        ["$\\delta$/mm", *dial_values],
-    ]
-    phi_rows = [
-        ["$\\varphi/10^{-4}\\ \\mathrm{rad}$", *[value / dial_arm * 1e4 for value in dial_values]],
-        ["$T$/N·m", *[load * arm for load in loads]],
-    ]
+    delta_force_kN = (loads[-1] - loads[0]) / (len(loads) - 1)
+    delta_dial = result["dial_method"]["report_delta_dial_mm"]
 
     half_runs = data["half_bridge_runs"]
     half_rows = []
@@ -809,18 +1002,25 @@ def shear_report_block(data: dict, result: dict) -> str:
         half_rows.append([f"第{index}次 $\\varepsilon_2$", *run["channel_2_micro"]])
     selected_index = result["half_bridge_method"]["selected_run"] - 1
     selected = half_runs[selected_index]
+    selected_result = result["half_bridge_method"]["runs"][selected_index]
     factor = float(selected.get("reading_to_gamma_factor", 1.0))
-    selected_gamma = [(a + b) / 2.0 * factor for a, b in zip(selected["channel_1_micro"], selected["channel_2_micro"])]
-    selected_tau = [load * 1000.0 * arm / result["Wp_mm3"] for load in selected["loads_kN"]]
-    electric_rows = [
-        ["$\\gamma/10^{-6}$", *selected_gamma],
-        ["$\\tau$/MPa", *selected_tau],
-    ]
+    selected_gamma = selected_result["gamma_micro"]
+    selected_tau = selected_result["tau_MPa"]
+    fit = selected_result["fit_tau_vs_gamma"]
+    chart = shear_stress_strain_chart(selected_result)
+
     full = result.get("full_bridge_method")
     full_input = data.get("full_bridge")
     dial_g = result["dial_method"]["G_report_MPa"] / 1000.0
     half_g = result["half_bridge_method"]["G_report_MPa"] / 1000.0
     difference = abs(dial_g - half_g) / abs(dial_g) * 100.0
+    factor_term = "" if factor == 1.0 else f"\\times {report_number(factor, 3)}"
+    ch1 = selected["channel_1_micro"]
+    ch2 = selected["channel_2_micro"]
+    delta_gamma_1 = selected_result["report_delta_gamma_1_micro"]
+    delta_gamma_2 = selected_result["report_delta_gamma_2_micro"]
+    delta_gamma = selected_result["report_delta_gamma_micro"]
+
     lines = [
         "## 六、实验数据记录与处理",
         "### 1. 尺寸与加载方案",
@@ -836,56 +1036,100 @@ def shear_report_block(data: dict, result: dict) -> str:
         (
             f"加载方案：$F_0={report_number(loads[0], 3)}\\ \\mathrm{{kN}}$，"
             f"$F_{{\\max}}={report_number(loads[-1], 3)}\\ \\mathrm{{kN}}$，"
-            f"$\\Delta F={report_number((loads[-1] - loads[0]) / (len(loads) - 1), 3)}\\ \\mathrm{{kN}}$，"
+            f"$\\Delta F={report_number(delta_force_kN, 3)}\\ \\mathrm{{kN}}$，"
             f"$n={len(loads) - 1}$。"
         ),
         "### 2. 扭角仪测 $G$",
-        markdown_table(["测量项", *[str(i + 1) for i in range(len(loads))]], dial_rows),
-        markdown_table(["计算项", *[str(i + 1) for i in range(len(loads))]], phi_rows),
-        (
-            f"逐差法得到平均位移增量 $\\Delta\\delta="
-            f"{report_number(result['dial_method']['report_delta_dial_mm'], 5)}\\ \\mathrm{{mm}}$，"
-            f"$I_p=\\pi D^4/32={report_number(result['Ip_mm4'], 2)}\\ \\mathrm{{mm^4}}$，"
-            f"故 $G={report_number(dial_g, 3)}\\ \\mathrm{{GPa}}$。"
+        markdown_table(
+            ["$F$/kN", *[report_number(value, 3) for value in loads]],
+            [["$\\delta$/mm", *[report_number(value, 5) for value in dial_values]]],
         ),
         (
-            f"用全部相邻加载级分别计算后取平均，复核值为 "
-            f"{report_number(result['dial_method']['G_mean_MPa'] / 1000.0, 3)} GPa。"
+            "$$\n"
+            "\\begin{aligned}\n"
+            f"\\Delta\\delta&=\\frac{{{report_number(dial_values[4], 5)}+{report_number(dial_values[3], 5)}-"
+            f"{report_number(dial_values[2], 5)}-{report_number(dial_values[1], 5)}}}{{4}}"
+            f"={report_number(delta_dial, 5)}\\ \\mathrm{{mm}},\\\\\n"
+            "I_p&=\\frac{\\pi D^4}{32},\\\\\n"
+            "G&=\\frac{\\Delta F\\,a\\,L\\,b}{\\Delta\\delta\\,I_p}\\\\\n"
+            f"&=\\frac{{{report_number(delta_force_kN * 1000.0, 3)}\\times{report_number(arm, 3)}\\times"
+            f"{report_number(gauge_length, 3)}\\times{report_number(dial_arm, 3)}}}"
+            f"{{{report_number(delta_dial, 5)}\\times\\frac{{\\pi({report_number(result['diameter_mm'], 3)})^4}}{{32}}}}\\\\\n"
+            f"&={report_number(dial_g, 3)}\\ \\mathrm{{GPa}}.\n"
+            "\\end{aligned}\n"
+            "$$"
         ),
         "### 3. 电测法求 $G$——半桥原始数据",
         "应变单位：$10^{-6}$。",
         markdown_table(["次数/通道", *[f"{report_number(load, 3)} kN" for load in loads]], half_rows),
-        "<details>\n<summary>第 2 页原图</summary>\n\n![扭转实验第2页原图](/report-images/扭转实验/page-2.png)\n\n</details>",
-        f"报告选用第 {selected_index + 1} 组重复数据作 $\\tau-\\gamma$ 处理：",
-        markdown_table(["计算项", *[str(i + 1) for i in range(len(loads))]], electric_rows),
+        (
+            "半桥把 $+45^\\circ$ 与 $-45^\\circ$ 应变片的效应相加。切应力和切应变按下式处理：\n\n"
+            "$$\n"
+            "\\tau=\\frac{T}{W_p}=\\frac{Fa}{\\frac{\\pi}{16}D^3}=\\frac{16Fa}{\\pi D^3},"
+            "\\qquad\\gamma=\\varepsilon_{-45^\\circ}-\\varepsilon_{+45^\\circ}.\n"
+            "$$"
+        ),
+        f"取第 {selected_index + 1} 组两通道的平均值作 $\\tau-\\gamma$ 图：",
+        markdown_table(
+            ["$\\gamma/10^{-6}$", *[report_number(value, 2) for value in selected_gamma]],
+            [["$\\tau$/MPa", *[report_number(value, 2) for value in selected_tau]]],
+        ),
+        f"![切应力—切应变直线拟合图]({chart})",
+        (
+            f"线性拟合斜率对应 $G={report_number(fit['slope'] / 1000.0, 3)}\\ \\mathrm{{GPa}}$，"
+            f"$R^2={report_number(fit['r2'], 6)}$，说明本次加载范围内切应力与切应变近似成正比。"
+        ),
         "### 4. 电测法求 $G$——全桥",
     ]
     if full and full_input:
+        example_index = 1 if len(full_input["readings_micro"]) > 1 else 0
+        example_reading = full_input["readings_micro"][example_index]
+        example_gamma = example_reading * full["reading_to_gamma_factor"]
         lines.extend([
             markdown_table(
-                ["测量项", *[f"{report_number(load, 3)} kN" for load in full_input["loads_kN"]]],
+                ["$F$/kN", *[report_number(load, 3) for load in full_input["loads_kN"]]],
                 [["$\\varepsilon/10^{-6}$", *full_input["readings_micro"]]],
             ),
             (
-                f"全桥显示值乘以 {report_number(full['reading_to_gamma_factor'], 3)} 折算为切应变，"
-                f"逐差法复核得到 $G={report_number(full['G_report_MPa'] / 1000.0, 3)}\\ \\mathrm{{GPa}}$。"
+                "全桥由四片应变片共同工作，仪器显示值约为等效切应变的 2 倍。"
+                f"例如 $F={report_number(full_input['loads_kN'][example_index], 3)}\\ \\mathrm{{kN}}$ 时，"
+                f"$\\gamma={report_number(example_reading, 3)}\\times{report_number(full['reading_to_gamma_factor'], 3)}"
+                f"={report_number(example_gamma, 2)}\\times10^{{-6}}$，与半桥结果接近。"
             ),
-            "<details>\n<summary>第 3 页原图</summary>\n\n![扭转实验第3页原图](/report-images/扭转实验/page-3.png)\n\n</details>",
         ])
     lines.extend([
         "### 5. 电测法的平均增量结果",
         (
-            f"第 {selected_index + 1} 组两通道逐差后取平均，得到 "
-            f"$\\Delta\\gamma={report_number(result['half_bridge_method']['report_delta_gamma_micro'], 3)}"
-            f"\\times10^{{-6}}$，$W_p=\\pi D^3/16="
-            f"{report_number(result['Wp_mm3'], 2)}\\ \\mathrm{{mm^3}}$。"
+            "$$\n"
+            "\\begin{aligned}\n"
+            f"\\Delta\\gamma_1&=\\frac{{{report_number(ch1[4], 3)}+{report_number(ch1[3], 3)}-"
+            f"{report_number(ch1[2], 3)}-{report_number(ch1[1], 3)}}}{{4}}{factor_term}\\times10^{{-6}}"
+            f"={report_number(delta_gamma_1, 3)}\\times10^{{-6}},\\\\\n"
+            f"\\Delta\\gamma_2&=\\frac{{{report_number(ch2[4], 3)}+{report_number(ch2[3], 3)}-"
+            f"{report_number(ch2[2], 3)}-{report_number(ch2[1], 3)}}}{{4}}{factor_term}\\times10^{{-6}}"
+            f"={report_number(delta_gamma_2, 3)}\\times10^{{-6}},\\\\\n"
+            f"\\Delta\\gamma&=\\frac{{\\Delta\\gamma_1+\\Delta\\gamma_2}}{{2}}"
+            f"={report_number(delta_gamma, 3)}\\times10^{{-6}}.\n"
+            "\\end{aligned}\n"
+            "$$"
         ),
-        f"因此电测法 $G={report_number(half_g, 3)}\\ \\mathrm{{GPa}}$。",
+        (
+            "$$\n"
+            "\\begin{aligned}\n"
+            "W_p&=\\frac{\\pi D^3}{16},\\\\\n"
+            "G&=\\frac{\\Delta F\\,a}{W_p\\Delta\\gamma}\\\\\n"
+            f"&=\\frac{{{report_number(delta_force_kN * 1000.0, 3)}\\times{report_number(arm, 3)}}}"
+            f"{{\\frac{{\\pi({report_number(result['diameter_mm'], 3)})^3}}{{16}}\\times"
+            f"{report_number(delta_gamma, 3)}\\times10^{{-6}}}}\\\\\n"
+            f"&={report_number(half_g, 3)}\\ \\mathrm{{GPa}}.\n"
+            "\\end{aligned}\n"
+            "$$"
+        ),
         "## 七、实验结论",
         (
-            f"扭角仪法按逐差法计算得到 $G={report_number(dial_g, 3)}\\ \\mathrm{{GPa}}$，"
+            f"扭角仪法按平均增量计算得到 $G={report_number(dial_g, 3)}\\ \\mathrm{{GPa}}$，"
             f"电测法得到 $G={report_number(half_g, 3)}\\ \\mathrm{{GPa}}$，"
-            f"两者相差约 {report_number(difference, 1)}%。$T-\\varphi$ 与 $\\tau-\\gamma$ 数据均近似呈线性，"
+            f"两者相差约 {report_number(difference, 1)}%。$\\tau-\\gamma$ 数据近似呈线性，"
             "说明在本次加载范围内圆轴满足扭转胡克定律。"
         ),
     ])
@@ -1119,6 +1363,13 @@ def is_reference_sample(exp: dict, data: dict) -> bool:
 
 def correct_reference_sample_report(exp: dict, source: str, result: dict) -> str:
     """Keep the scan transcription intact while fixing confirmed hand-calculation errors."""
+    if exp["id"] == "B031":
+        hooke_start = source.index("验证胡克定律：")
+        conclusion_start = source.index("## 六、实验结论", hooke_start)
+        return (
+            source[:hooke_start].rstrip() + "\n\n" + elastic_hooke_section(result) + "\n\n" +
+            source[conclusion_start:].lstrip()
+        )
     if exp["id"] != "B071":
         return source
 
@@ -1153,7 +1404,7 @@ def merge_report_markdown(exp: dict, data: dict, result: dict, metadata: dict) -
     source_path = REPORT_SOURCE_ROOT / exp["report_file"]
     source = replace_report_metadata(source_path.read_text(encoding="utf-8"), metadata)
     source = source.replace("](images/", "](/report-images/")
-    if is_reference_sample(exp, data):
+    if is_reference_sample(exp, data) and exp["id"] != "B041":
         return correct_reference_sample_report(exp, source, result)
     blocks = report_block(exp["id"], data, result)
 
