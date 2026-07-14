@@ -152,6 +152,60 @@ def calculate_mechanical_properties(data: dict[str, Any]) -> dict[str, Any]:
     return results
 
 
+def detect_elastic_channel_pairs(runs: list[dict[str, Any]]) -> dict[str, Any]:
+    """Pair four strain channels by similarity, then identify axial/transverse pairs."""
+    traces: list[list[float]] = [[] for _ in range(4)]
+    for run_index, run in enumerate(runs):
+        readings = require(run, "readings_micro", f"elastic_constants.runs[{run_index}]")
+        parsed_rows = [numbers(row) for row in readings]
+        if not parsed_rows:
+            raise InputError(f"elastic_constants.runs[{run_index}].readings_micro 不能为空")
+        if any(len(row) != 4 for row in parsed_rows):
+            raise InputError(
+                f"elastic_constants.runs[{run_index}].readings_micro 每个加载级必须输入 4 个通道"
+            )
+        baseline = parsed_rows[0]
+        for row in parsed_rows[1:]:
+            for channel in range(4):
+                traces[channel].append(row[channel] - baseline[channel])
+
+    pairings = (
+        ((0, 1), (2, 3)),
+        ((0, 2), (1, 3)),
+        ((0, 3), (1, 2)),
+    )
+
+    def pairing_error(pairing: tuple[tuple[int, int], tuple[int, int]]) -> float:
+        return sum(
+            (left - right) ** 2
+            for pair in pairing
+            for left, right in zip(traces[pair[0]], traces[pair[1]])
+        )
+
+    selected_pairs = min(pairings, key=pairing_error)
+
+    def pair_magnitude(pair: tuple[int, int]) -> float:
+        combined = [
+            (left + right) / 2.0
+            for left, right in zip(traces[pair[0]], traces[pair[1]])
+        ]
+        return mean(abs(value) for value in combined) if combined else 0.0
+
+    first_magnitude = pair_magnitude(selected_pairs[0])
+    second_magnitude = pair_magnitude(selected_pairs[1])
+    if first_magnitude >= second_magnitude:
+        axial_channels, transverse_channels = selected_pairs
+    else:
+        transverse_channels, axial_channels = selected_pairs
+
+    sample_count = max(sum(len(traces[channel]) for channel in range(4)) // 2, 1)
+    return {
+        "axial_channels": list(axial_channels),
+        "transverse_channels": list(transverse_channels),
+        "pairing_rmse_micro": math.sqrt(pairing_error(selected_pairs) / sample_count),
+    }
+
+
 def calculate_elastic_constants(data: dict[str, Any]) -> dict[str, Any]:
     width = average(require(data, "width_mm", "elastic_constants"), "elastic_constants.width_mm")
     thickness = average(
@@ -159,17 +213,21 @@ def calculate_elastic_constants(data: dict[str, Any]) -> dict[str, Any]:
         "elastic_constants.thickness_mm",
     )
     area = width * thickness
-    axial_channels = [int(i) for i in data.get("axial_channels", [0, 1])]
-    transverse_channels = [int(i) for i in data.get("transverse_channels", [2, 3])]
     runs = require(data, "runs", "elastic_constants")
+    channel_pairing = detect_elastic_channel_pairs(runs)
+    axial_channels = channel_pairing["axial_channels"]
+    transverse_channels = channel_pairing["transverse_channels"]
     interval_groups: dict[int, list[dict[str, float]]] = {}
     curve_groups: dict[int, list[dict[str, float]]] = {}
 
     for run_index, run in enumerate(runs):
         loads = numbers(require(run, "loads_kN", f"elastic_constants.runs[{run_index}]"))
         readings = require(run, "readings_micro", f"elastic_constants.runs[{run_index}]")
-        if len(loads) != len(readings) or len(loads) < 2:
-            raise InputError(f"elastic_constants.runs[{run_index}] 载荷与读数长度必须相同且不少于 2")
+        if len(loads) != len(readings) or len(loads) < 3:
+            raise InputError(
+                f"elastic_constants.runs[{run_index}] 载荷与读数长度必须相同且不少于 3，"
+                "以便完成应力—应变直线拟合"
+            )
         axial: list[float] = []
         transverse: list[float] = []
         for level, row in enumerate(readings):
@@ -212,23 +270,31 @@ def calculate_elastic_constants(data: dict[str, Any]) -> dict[str, Any]:
 
     strain_curve: list[float] = []
     stress_curve: list[float] = []
-    first_load = mean(item["load_kN"] for item in curve_groups[min(curve_groups)])
+    stress_strain_curve: list[dict[str, float]] = []
     for level in sorted(curve_groups):
         if level == min(curve_groups):
             continue
         row_group = curve_groups[level]
         load = mean(item["load_kN"] for item in row_group)
         axial_micro = mean(item["axial_micro"] for item in row_group)
+        stress_MPa = load * 1000.0 / area
         strain_curve.append(axial_micro * 1e-6)
-        stress_curve.append((load - first_load) * 1000.0 / area)
+        stress_curve.append(stress_MPa)
+        stress_strain_curve.append({
+            "load_kN": load,
+            "strain_micro": axial_micro,
+            "stress_MPa": stress_MPa,
+        })
     fit = linear_fit(strain_curve, stress_curve)
     return {
         "width_mm": width,
         "thickness_mm": thickness,
         "area_mm2": area,
+        "channel_pairing": channel_pairing,
         "intervals": interval_results,
         "E_mean_MPa": mean(row["E_MPa"] for row in interval_results),
         "mu_mean": mean(row["mu"] for row in interval_results),
+        "stress_strain_curve": stress_strain_curve,
         "stress_strain_fit": fit,
     }
 
@@ -285,12 +351,22 @@ def calculate_shear_modulus(data: dict[str, Any]) -> dict[str, Any]:
         values = _increment_moduli(tau, gamma, 1.0)
         report_delta_tau = _report_difference_increment(tau)
         report_delta_gamma = _report_difference_increment(gamma)
+        report_delta_gamma_1 = _report_difference_increment(
+            [value * gamma_factor * 1e-6 for value in ch1]
+        )
+        report_delta_gamma_2 = _report_difference_increment(
+            [value * gamma_factor * 1e-6 for value in ch2]
+        )
         report_G = report_delta_tau / report_delta_gamma
         electric_G.extend(values)
         electric_runs.append({
             "run": run_index + 1,
             "G_increment_MPa": values,
             "G_mean_MPa": mean(values),
+            "gamma_micro": [value * 1e6 for value in gamma],
+            "tau_MPa": tau,
+            "report_delta_gamma_1_micro": report_delta_gamma_1 * 1e6,
+            "report_delta_gamma_2_micro": report_delta_gamma_2 * 1e6,
             "report_delta_gamma_micro": report_delta_gamma * 1e6,
             "G_report_MPa": report_G,
             "fit_tau_vs_gamma": linear_fit(gamma, tau),
@@ -352,32 +428,63 @@ def calculate_beam_bending(data: dict[str, Any]) -> dict[str, Any]:
     load_spacing = average(require(data, "load_spacing_mm", "beam_bending"))
     moment = delta_force * load_spacing / 2.0
 
+    gage_order = ["1", "2", "3", "4", "5", "7", "8", "9", "10"]
+    raw_readings = require(data, "point_readings_micro", "beam_bending")
+    if not isinstance(raw_readings, list):
+        raise InputError("beam_bending.point_readings_micro 必须是若干行 9 列的矩阵")
+    reading_matrix: list[list[float]] = []
+    for run_index, row in enumerate(raw_readings):
+        if not isinstance(row, list) or len(row) != len(gage_order):
+            raise InputError(
+                f"beam_bending.point_readings_micro[{run_index}] 必须按测点 "
+                "1、2、3、4、5、7、8、9、10 输入 9 列"
+            )
+        if any(value in (None, "") for value in row):
+            raise InputError(f"beam_bending.point_readings_micro[{run_index}] 存在空读数")
+        reading_matrix.append([float(value) for value in row])
+    if not reading_matrix:
+        raise InputError("beam_bending.point_readings_micro 至少需要一行读数")
+    mean_readings = [mean(row[column] for row in reading_matrix) for column in range(len(gage_order))]
+
+    longitudinal_specs = [
+        ("2", -25.0, 1),
+        ("3", -20.0, 2),
+        ("4", -10.0, 3),
+        ("5", 0.0, 4),
+        ("7", 10.0, 5),
+        ("8", 20.0, 6),
+        ("9", 25.0, 7),
+    ]
     points = []
-    for index, row in enumerate(require(data, "longitudinal_points", "beam_bending")):
-        valid = bool(row.get("valid", True))
-        y = average(require(row, "y_mm", f"longitudinal_points[{index}]"))
-        strain = average_optional(row.get("readings_micro")) if valid else None
+    for gage, y, column in longitudinal_specs:
+        strain = mean_readings[column]
         theory = moment * y / inertia
-        experimental = None if strain is None else elastic_modulus * strain * 1e-6
+        experimental = elastic_modulus * strain * 1e-6
         points.append({
-            "gage": row.get("gage", ""),
+            "gage": gage,
             "y_mm": y,
-            "valid": valid,
+            "valid": True,
             "strain_micro": strain,
             "stress_theory_MPa": theory,
             "stress_experimental_MPa": experimental,
             "relative_error_pct": relative_error_pct(experimental, theory),
-            "note": row.get("note", ""),
+            "note": "",
         })
 
-    mu_values = []
-    for row in require(data, "poisson_surfaces", "beam_bending"):
-        longitudinal = average(require(row, "longitudinal_micro", "beam_bending.poisson_surfaces"))
-        transverse = average(require(row, "transverse_micro", "beam_bending.poisson_surfaces"))
-        mu_values.append({
-            "surface": row.get("surface", ""),
-            "mu": abs(transverse / longitudinal),
-        })
+    mu_values = [
+        {
+            "surface": "上表面",
+            "longitudinal_micro": mean_readings[1],
+            "transverse_micro": mean_readings[0],
+            "mu": abs(mean_readings[0] / mean_readings[1]),
+        },
+        {
+            "surface": "下表面",
+            "longitudinal_micro": mean_readings[7],
+            "transverse_micro": mean_readings[8],
+            "mu": abs(mean_readings[8] / mean_readings[7]),
+        },
+    ]
     mu_mean = mean(item["mu"] for item in mu_values)
 
     full = require(data, "full_bridge", "beam_bending")
@@ -385,11 +492,21 @@ def calculate_beam_bending(data: dict[str, Any]) -> dict[str, Any]:
     factor = float(full.get("display_factor", 4.0))
     max_strain = full_reading / factor
     return {
+        "E_MPa": elastic_modulus,
         "width_mm": width,
         "height_mm": height,
         "Iz_mm4": inertia,
+        "delta_force_N": delta_force,
+        "load_spacing_mm": load_spacing,
         "moment_Nmm": moment,
+        "gage_order": gage_order,
+        "raw_readings_micro": reading_matrix,
+        "mean_readings_micro": mean_readings,
         "points": points,
+        "stress_fit": linear_fit(
+            [item["y_mm"] for item in points],
+            [item["stress_experimental_MPa"] for item in points],
+        ),
         "poisson_surfaces": mu_values,
         "mu_mean": mu_mean,
         "mu_reference": mu_reference,
@@ -425,11 +542,32 @@ def calculate_beam_deformation(data: dict[str, Any]) -> dict[str, Any]:
     cantilever_width = average(require(cantilever, "width_mm", "beam_deformation.cantilever"))
     cantilever_height = average(require(cantilever, "height_mm", "beam_deformation.cantilever"))
     wz = cantilever_width * cantilever_height**2 / 6.0
-    eps_1 = average(require(cantilever, "strain_position_1_micro", "beam_deformation.cantilever"))
-    eps_2 = average(require(cantilever, "strain_position_2_micro", "beam_deformation.cantilever"))
+    raw_strain_readings = require(cantilever, "strain_readings_micro", "beam_deformation.cantilever")
+    if not isinstance(raw_strain_readings, list):
+        raise InputError("beam_deformation.cantilever.strain_readings_micro 必须是若干行 2 列的矩阵")
+    strain_readings: list[list[float]] = []
+    for run_index, row in enumerate(raw_strain_readings):
+        if not isinstance(row, list) or len(row) != 2:
+            raise InputError(
+                f"beam_deformation.cantilever.strain_readings_micro[{run_index}] "
+                "必须输入第 1 组和第 2 组共 2 列原始应变读数"
+            )
+        if any(value in (None, "") for value in row):
+            raise InputError(
+                f"beam_deformation.cantilever.strain_readings_micro[{run_index}] 存在空读数"
+            )
+        strain_readings.append([float(row[0]), float(row[1])])
+    if not strain_readings:
+        raise InputError("beam_deformation.cantilever.strain_readings_micro 至少需要一行原始读数")
+    strain_group_1 = [row[0] for row in strain_readings]
+    strain_group_2 = [row[1] for row in strain_readings]
+    strain_differences = [row[0] - row[1] for row in strain_readings]
+    eps_1 = mean(strain_group_1)
+    eps_2 = mean(strain_group_2)
+    strain_difference = eps_1 - eps_2
     l12 = average(require(cantilever, "position_spacing_mm", "beam_deformation.cantilever"))
     gravity = float(cantilever.get("gravity_m_s2", 9.8))
-    mass = cantilever_E * (eps_1 - eps_2) * 1e-6 * wz / (l12 * gravity)
+    mass = cantilever_E * strain_difference * 1e-6 * wz / (l12 * gravity)
 
     return {
         "simply_supported": {
@@ -449,10 +587,19 @@ def calculate_beam_deformation(data: dict[str, Any]) -> dict[str, Any]:
             "curve_points": simple.get("curve_points", []),
         },
         "cantilever": {
+            "E_MPa": cantilever_E,
             "width_mm": cantilever_width,
             "height_mm": cantilever_height,
             "Wz_mm3": wz,
-            "strain_difference_micro": eps_1 - eps_2,
+            "position_spacing_mm": l12,
+            "gravity_m_s2": gravity,
+            "raw_strain_readings_micro": strain_readings,
+            "strain_group_1_micro": strain_group_1,
+            "strain_group_2_micro": strain_group_2,
+            "strain_differences_micro": strain_differences,
+            "mean_strain_group_1_micro": eps_1,
+            "mean_strain_group_2_micro": eps_2,
+            "strain_difference_micro": strain_difference,
             "mass_kg": mass,
         },
     }
@@ -466,10 +613,48 @@ def normalize_principal_angle(angle_deg: float) -> float:
     return angle_deg
 
 
-def principal_from_rosette(E_MPa: float, mu: float, eps0: float, eps45: float, epsm45: float) -> dict[str, float]:
-    ex = eps0 * 1e-6
-    ey = (eps45 + epsm45 - eps0) * 1e-6
-    gamma = (epsm45 - eps45) * 1e-6
+def solve_three_direction_strains(angles_deg: list[float], strains_micro: list[float]) -> tuple[float, float, float]:
+    if len(angles_deg) != 3 or len(strains_micro) != 3:
+        raise InputError("四分之一桥必须提供 3 个测量方向及对应应变")
+    augmented = []
+    for angle_deg, strain_micro in zip(angles_deg, strains_micro):
+        angle = math.radians(angle_deg)
+        cosine = math.cos(angle)
+        sine = math.sin(angle)
+        augmented.append([
+            cosine**2,
+            sine**2,
+            -sine * cosine,
+            strain_micro,
+        ])
+    for column in range(3):
+        pivot = max(range(column, 3), key=lambda row: abs(augmented[row][column]))
+        if abs(augmented[pivot][column]) < 1e-10:
+            raise InputError("四分之一桥的 3 个方位角组合无法唯一确定平面应变，请调整测点方位")
+        augmented[column], augmented[pivot] = augmented[pivot], augmented[column]
+        pivot_value = augmented[column][column]
+        augmented[column] = [value / pivot_value for value in augmented[column]]
+        for row in range(3):
+            if row == column:
+                continue
+            factor = augmented[row][column]
+            augmented[row] = [
+                value - factor * pivot_component
+                for value, pivot_component in zip(augmented[row], augmented[column])
+            ]
+    return augmented[0][3], augmented[1][3], augmented[2][3]
+
+
+def principal_from_rosette(
+    E_MPa: float,
+    mu: float,
+    angles_deg: list[float],
+    strains_micro: list[float],
+) -> dict[str, float]:
+    ex_micro, ey_micro, gamma_micro = solve_three_direction_strains(angles_deg, strains_micro)
+    ex = ex_micro * 1e-6
+    ey = ey_micro * 1e-6
+    gamma = gamma_micro * 1e-6
     avg = (ex + ey) / 2.0
     radius = math.sqrt(((ex - ey) / 2.0) ** 2 + (gamma / 2.0) ** 2)
     eps1 = avg + radius
@@ -517,19 +702,43 @@ def calculate_bending_torsion(data: dict[str, Any]) -> dict[str, Any]:
 
     surface_results = []
     rosettes = require(data, "rosettes", "bending_torsion")
+    rosette_repeat_count = None
     for surface in ("upper", "lower"):
         row = require(rosettes, surface, "bending_torsion.rosettes")
-        eps0 = average(require(row, "epsilon_0_micro", f"rosettes.{surface}"))
-        eps45 = average(require(row, "epsilon_p45_micro", f"rosettes.{surface}"))
-        epsm45 = average(require(row, "epsilon_m45_micro", f"rosettes.{surface}"))
-        experimental = principal_from_rosette(elastic_modulus, mu, eps0, eps45, epsm45)
+        measurement_points = require(row, "measurement_points", f"rosettes.{surface}")
+        if not isinstance(measurement_points, list) or len(measurement_points) != 3:
+            raise InputError(f"rosettes.{surface}.measurement_points 必须包含 3 个四分之一桥测点")
+        angles = []
+        mean_strains = []
+        point_results = []
+        for point_index, point in enumerate(measurement_points):
+            angle_value = require(point, "angle_deg", f"rosettes.{surface}.measurement_points[{point_index}]")
+            if isinstance(angle_value, list):
+                raise InputError(f"rosettes.{surface}.measurement_points[{point_index}].angle_deg 必须是单个方位角")
+            angle = float(angle_value)
+            if not math.isfinite(angle):
+                raise InputError(f"rosettes.{surface}.measurement_points[{point_index}].angle_deg 必须是有限数值")
+            readings = numbers(require(point, "readings_micro", f"rosettes.{surface}.measurement_points[{point_index}]"))
+            if not readings:
+                raise InputError(f"rosettes.{surface}.measurement_points[{point_index}].readings_micro 至少需要一个读数")
+            if rosette_repeat_count is None:
+                rosette_repeat_count = len(readings)
+            elif len(readings) != rosette_repeat_count:
+                raise InputError("B071 四分之一桥各测点的重复读数数量必须一致")
+            mean_strain = mean(readings)
+            angles.append(angle)
+            mean_strains.append(mean_strain)
+            point_results.append({
+                "angle_deg": angle,
+                "readings_micro": readings,
+                "mean_strain_micro": mean_strain,
+            })
+        experimental = principal_from_rosette(elastic_modulus, mu, angles, mean_strains)
         sigma_x = sigma_magnitude if surface == "upper" else -sigma_magnitude
         theoretical = principal_theory(sigma_x, tau_magnitude)
         surface_results.append({
             "surface": surface,
-            "mean_epsilon_0_micro": eps0,
-            "mean_epsilon_p45_micro": eps45,
-            "mean_epsilon_m45_micro": epsm45,
+            "measurement_points": point_results,
             "experimental": experimental,
             "theoretical": theoretical,
             "sigma_1_error_pct": relative_error_pct(experimental["sigma_1_MPa"], theoretical["sigma_1_MPa"]),
@@ -556,6 +765,7 @@ def calculate_bending_torsion(data: dict[str, Any]) -> dict[str, Any]:
         "Wp_mm3": wp,
         "moment_theoretical_Nmm": moment_theory,
         "torque_theoretical_Nmm": torque_theory,
+        "rosette_repeat_count": rosette_repeat_count,
         "surface_results": surface_results,
         "bending_bridge": {
             "mean_display_micro": half_display,

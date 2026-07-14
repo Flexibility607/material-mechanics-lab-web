@@ -77,8 +77,6 @@
       "material": "7075铝合金",
       "width_mm": [24.42, 24.46, 24.41],
       "thickness_mm": [8.03, 7.99, 8.04],
-      "axial_channels": [0, 3],
-      "transverse_channels": [1, 2],
       "runs": [
         {
           "loads_kN": [2, 6, 10, 14, 18],
@@ -131,18 +129,9 @@
       "height_mm": [49.84, 49.92, 49.81],
       "delta_force_kN": 8.0,
       "load_spacing_mm": 100.0,
-      "longitudinal_points": [
-        {"gage": "2", "y_mm": -25, "readings_micro": [-157, -155]},
-        {"gage": "3", "y_mm": -20, "valid": false, "note": "应变片损坏"},
-        {"gage": "4", "y_mm": -10, "readings_micro": [-63, -63]},
-        {"gage": "5", "y_mm": 0, "readings_micro": [-2, -2]},
-        {"gage": "7", "y_mm": 10, "readings_micro": [60, 60]},
-        {"gage": "8", "y_mm": 20, "readings_micro": [119, 119]},
-        {"gage": "9", "y_mm": 25, "readings_micro": [151, 153]}
-      ],
-      "poisson_surfaces": [
-        {"surface": "上表面", "longitudinal_micro": [-157, -155], "transverse_micro": [43, 44]},
-        {"surface": "下表面", "longitudinal_micro": [151, 153], "transverse_micro": [-45, -43]}
+      "point_readings_micro": [
+        [43, -157, -125, -63, -2, 60, 119, 151, -45],
+        [44, -155, -124, -63, -2, 60, 119, 153, -43]
       ],
       "full_bridge": {
         "readings_micro": [-624],
@@ -172,8 +161,12 @@
         "width_mm": [14.0, 14.01, 14.02],
         "height_mm": [7.06, 7.05, 7.0],
         "position_spacing_mm": 300.0,
-        "strain_position_1_micro": [151, 151, 152, 151],
-        "strain_position_2_micro": [66, 65, 65, 64],
+        "strain_readings_micro": [
+          [151, 66],
+          [151, 65],
+          [152, 65],
+          [151, 64]
+        ],
         "gravity_m_s2": 9.8
       }
     },
@@ -187,14 +180,18 @@
       "torsion_arm_mm": 200.0,
       "rosettes": {
         "upper": {
-          "epsilon_p45_micro": [-149, -147, -147, -148],
-          "epsilon_0_micro": [622, 627, 627, 626],
-          "epsilon_m45_micro": [601, 599, 605, 607]
+          "measurement_points": [
+            {"angle_deg": 45.0, "readings_micro": [-149, -147, -147, -148]},
+            {"angle_deg": 0.0, "readings_micro": [622, 627, 627, 626]},
+            {"angle_deg": -45.0, "readings_micro": [601, 599, 605, 607]}
+          ]
         },
         "lower": {
-          "epsilon_p45_micro": [-578, -586, -576, -578],
-          "epsilon_0_micro": [-628, -624, -627, -625],
-          "epsilon_m45_micro": [144, 142, 146, 143]
+          "measurement_points": [
+            {"angle_deg": 45.0, "readings_micro": [-578, -586, -576, -578]},
+            {"angle_deg": 0.0, "readings_micro": [-628, -624, -627, -625]},
+            {"angle_deg": -45.0, "readings_micro": [144, 142, 146, 143]}
+          ]
         }
       },
       "half_bridge_bending": {

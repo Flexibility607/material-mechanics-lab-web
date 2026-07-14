@@ -984,6 +984,74 @@ def shear_stress_strain_chart(selected_result: dict) -> str:
     return f"data:image/svg+xml;base64,{encoded}"
 
 
+def torque_twist_chart(phi_values: list[float], torque_values: list[float], fit: dict) -> str:
+    width, height = 760, 460
+    left, right, top, bottom = 86, 724, 66, 382
+    plot_width, plot_height = right - left, bottom - top
+    x_max, x_step = _nice_chart_axis(max(phi_values) * 1.06)
+    y_max, y_step = _nice_chart_axis(max(torque_values) * 1.08)
+
+    def x_position(value: float) -> float:
+        return left + value / x_max * plot_width
+
+    def y_position(value: float) -> float:
+        return bottom - value / y_max * plot_height
+
+    svg = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" role="img" aria-labelledby="title desc">',
+        '<title id="title">扭矩—扭转角直线拟合图</title>',
+        '<desc id="desc">横轴为扭转角，纵轴为扭矩，包含实验点和最小二乘拟合直线。</desc>',
+        '<rect width="760" height="460" fill="#ffffff"/>',
+        '<text x="380" y="30" text-anchor="middle" font-family="Microsoft YaHei, SimSun, sans-serif" font-size="19" font-weight="700" fill="#172033">扭矩—扭转角直线拟合</text>',
+        f'<clipPath id="torque-twist-plot-clip"><rect x="{left}" y="{top}" width="{plot_width}" height="{plot_height}"/></clipPath>',
+    ]
+    for index in range(int(round(x_max / x_step)) + 1):
+        value = index * x_step
+        x = x_position(value)
+        svg.extend([
+            f'<line x1="{x:.2f}" y1="{top}" x2="{x:.2f}" y2="{bottom}" stroke="#dce4e8" stroke-width="1"/>',
+            f'<text x="{x:.2f}" y="{bottom + 24}" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#354052">{report_number(value, 0)}</text>',
+        ])
+    for index in range(int(round(y_max / y_step)) + 1):
+        value = index * y_step
+        y = y_position(value)
+        svg.extend([
+            f'<line x1="{left}" y1="{y:.2f}" x2="{right}" y2="{y:.2f}" stroke="#dce4e8" stroke-width="1"/>',
+            f'<text x="{left - 12}" y="{y + 4:.2f}" text-anchor="end" font-family="Arial, sans-serif" font-size="12" fill="#354052">{report_number(value, 0)}</text>',
+        ])
+    svg.extend([
+        f'<line x1="{left}" y1="{bottom}" x2="{right}" y2="{bottom}" stroke="#172033" stroke-width="2"/>',
+        f'<line x1="{left}" y1="{bottom}" x2="{left}" y2="{top}" stroke="#172033" stroke-width="2"/>',
+        f'<text x="{(left + right) / 2:.2f}" y="438" text-anchor="middle" font-family="Microsoft YaHei, SimSun, sans-serif" font-size="14" fill="#172033">扭转角 φ / 10⁻⁴ rad</text>',
+        f'<text x="23" y="{(top + bottom) / 2:.2f}" text-anchor="middle" transform="rotate(-90 23 {(top + bottom) / 2:.2f})" font-family="Microsoft YaHei, SimSun, sans-serif" font-size="14" fill="#172033">扭矩 T / N·m</text>',
+    ])
+    slope = fit["slope"]
+    intercept = fit["intercept"]
+    fit_y_start = intercept / 1000.0
+    fit_y_end = (slope * x_max * 1e-4 + intercept) / 1000.0
+    svg.append(
+        f'<line x1="{x_position(0):.2f}" y1="{y_position(fit_y_start):.2f}" x2="{x_position(x_max):.2f}" y2="{y_position(fit_y_end):.2f}" '
+        'stroke="#0f766e" stroke-width="3" clip-path="url(#torque-twist-plot-clip)"/>'
+    )
+    for phi, torque in zip(phi_values, torque_values):
+        svg.append(
+            f'<circle cx="{x_position(phi):.2f}" cy="{y_position(torque):.2f}" r="5.5" fill="#d97706" stroke="#ffffff" stroke-width="2">'
+            f'<title>φ={phi:.2f}×10⁻⁴ rad，T={torque:.2f} N·m</title></circle>'
+        )
+    equation = f'T = {slope / 1e7:.4f}(φ/10⁻⁴) {intercept / 1000.0:+.2f}，R² = {fit["r2"]:.6f}'
+    svg.extend([
+        f'<rect x="{left + 14}" y="{top + 13}" width="358" height="58" rx="6" fill="#ffffff" fill-opacity="0.92" stroke="#cbd5dc"/>',
+        f'<text x="{left + 28}" y="{top + 36}" font-family="Microsoft YaHei, SimSun, sans-serif" font-size="13" fill="#172033">{equation}</text>',
+        f'<line x1="{left + 28}" y1="{top + 55}" x2="{left + 58}" y2="{top + 55}" stroke="#0f766e" stroke-width="3"/>',
+        f'<text x="{left + 66}" y="{top + 59}" font-family="Microsoft YaHei, SimSun, sans-serif" font-size="12" fill="#354052">拟合直线</text>',
+        f'<circle cx="{left + 157}" cy="{top + 55}" r="4.5" fill="#d97706"/>',
+        f'<text x="{left + 168}" y="{top + 59}" font-family="Microsoft YaHei, SimSun, sans-serif" font-size="12" fill="#354052">实验点</text>',
+        '</svg>',
+    ])
+    encoded = base64.b64encode("".join(svg).encode("utf-8")).decode("ascii")
+    return f"data:image/svg+xml;base64,{encoded}"
+
+
 def shear_report_block(data: dict, result: dict) -> str:
     dial = data["dial_run"]
     loads = dial["loads_kN"]
@@ -1011,6 +1079,11 @@ def shear_report_block(data: dict, result: dict) -> str:
 
     full = result.get("full_bridge_method")
     full_input = data.get("full_bridge")
+    torque_values = [load * arm for load in loads]
+    phi_values = [value / dial_arm * 1e4 for value in dial_values]
+    torque_twist_fit = result["dial_method"]["fit_T_vs_phi"]
+    torque_twist_g = torque_twist_fit["slope"] * gauge_length / result["Ip_mm4"] / 1000.0
+    torque_twist_plot = torque_twist_chart(phi_values, torque_values, torque_twist_fit)
     dial_g = result["dial_method"]["G_report_MPa"] / 1000.0
     half_g = result["half_bridge_method"]["G_report_MPa"] / 1000.0
     difference = abs(dial_g - half_g) / abs(dial_g) * 100.0
@@ -1086,6 +1159,7 @@ def shear_report_block(data: dict, result: dict) -> str:
         example_reading = full_input["readings_micro"][example_index]
         example_gamma = example_reading * full["reading_to_gamma_factor"]
         lines.extend([
+            "全桥原始读数如下（应变单位：$10^{-6}$）：",
             markdown_table(
                 ["$F$/kN", *[report_number(load, 3) for load in full_input["loads_kN"]]],
                 [["$\\varepsilon/10^{-6}$", *full_input["readings_micro"]]],
@@ -1095,6 +1169,30 @@ def shear_report_block(data: dict, result: dict) -> str:
                 f"例如 $F={report_number(full_input['loads_kN'][example_index], 3)}\\ \\mathrm{{kN}}$ 时，"
                 f"$\\gamma={report_number(example_reading, 3)}\\times{report_number(full['reading_to_gamma_factor'], 3)}"
                 f"={report_number(example_gamma, 2)}\\times10^{{-6}}$，与半桥结果接近。"
+            ),
+            (
+                "与全桥读数同一加载级的载荷 $F$ 和扭角仪位移 $\\delta$，按下式换算为扭矩 $T$ "
+                "和扭转角 $\\varphi$：\n\n"
+                "$$\n"
+                "T=Fa,\\qquad \\varphi=\\frac{\\delta}{b}.\n"
+                "$$"
+            ),
+            markdown_table(
+                ["$\\varphi/10^{-4}\\ \\mathrm{rad}$", *[report_number(value, 2) for value in phi_values]],
+                [["$T$/N·m", *[report_number(value, 3) for value in torque_values]]],
+            ),
+            f"![扭矩—扭转角直线拟合图]({torque_twist_plot})",
+            (
+                "由 $T-\\varphi$ 拟合直线的斜率 $k_{T-\\varphi}=\\Delta T/\\Delta\\varphi$ 求切变模量：\n\n"
+                "$$\n"
+                "\\begin{aligned}\n"
+                f"k_{{T-\\varphi}}&={report_number(torque_twist_fit['slope'] / 1000.0, 3)}\\ \\mathrm{{N\\cdot m/rad}},\\\\\n"
+                "G_{T-\\varphi}&=\\frac{k_{T-\\varphi}L}{I_p}"
+                "=\\frac{k_{T-\\varphi}L}{\\frac{\\pi D^4}{32}}\\\\\n"
+                f"&={report_number(torque_twist_g, 3)}\\ \\mathrm{{GPa}}.\n"
+                "\\end{aligned}\n"
+                "$$\n\n"
+                f"拟合优度 $R^2={report_number(torque_twist_fit['r2'], 6)}$，$T-\\varphi$ 数据在本次加载范围内近似呈线性。"
             ),
         ])
     lines.extend([
@@ -1136,34 +1234,216 @@ def shear_report_block(data: dict, result: dict) -> str:
     return "\n\n".join(lines)
 
 
+def beam_stress_distribution_chart(points: list[dict]) -> str:
+    ordered = sorted(points, key=lambda item: item["y_mm"])
+    x_max, x_step = _nice_chart_axis(max(abs(item["y_mm"]) for item in ordered) * 1.08)
+    stress_values = [
+        value
+        for item in ordered
+        for value in (item["stress_theory_MPa"], item["stress_experimental_MPa"])
+        if value is not None
+    ]
+    y_max, y_step = _nice_chart_axis(max(abs(value) for value in stress_values) * 1.08)
+    width, height = 760, 460
+    left, right, top, bottom = 86, 724, 66, 382
+    plot_width, plot_height = right - left, bottom - top
+
+    def x_position(value: float) -> float:
+        return left + (value + x_max) / (2.0 * x_max) * plot_width
+
+    def y_position(value: float) -> float:
+        return bottom - (value + y_max) / (2.0 * y_max) * plot_height
+
+    svg = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" role="img" aria-labelledby="title desc">',
+        '<title id="title">截面高度—弯曲正应力曲线</title>',
+        '<desc id="desc">横轴为测点到中性层的距离，纵轴为弯曲正应力，包含理论曲线和实验曲线。</desc>',
+        '<rect width="760" height="460" fill="#ffffff"/>',
+        '<text x="380" y="30" text-anchor="middle" font-family="Microsoft YaHei, SimSun, sans-serif" font-size="19" font-weight="700" fill="#172033">截面高度—弯曲正应力</text>',
+        f'<clipPath id="beam-stress-plot-clip"><rect x="{left}" y="{top}" width="{plot_width}" height="{plot_height}"/></clipPath>',
+    ]
+    x_tick_count = int(round(x_max / x_step))
+    y_tick_count = int(round(y_max / y_step))
+    for index in range(-x_tick_count, x_tick_count + 1):
+        value = index * x_step
+        x = x_position(value)
+        svg.extend([
+            f'<line x1="{x:.2f}" y1="{top}" x2="{x:.2f}" y2="{bottom}" stroke="#dce4e8" stroke-width="1"/>',
+            f'<text x="{x:.2f}" y="{bottom + 24}" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#354052">{report_number(value, 0)}</text>',
+        ])
+    for index in range(-y_tick_count, y_tick_count + 1):
+        value = index * y_step
+        y = y_position(value)
+        svg.extend([
+            f'<line x1="{left}" y1="{y:.2f}" x2="{right}" y2="{y:.2f}" stroke="#dce4e8" stroke-width="1"/>',
+            f'<text x="{left - 12}" y="{y + 4:.2f}" text-anchor="end" font-family="Arial, sans-serif" font-size="12" fill="#354052">{report_number(value, 0)}</text>',
+        ])
+    svg.extend([
+        f'<line x1="{left}" y1="{y_position(0):.2f}" x2="{right}" y2="{y_position(0):.2f}" stroke="#172033" stroke-width="2"/>',
+        f'<line x1="{x_position(0):.2f}" y1="{bottom}" x2="{x_position(0):.2f}" y2="{top}" stroke="#172033" stroke-width="2"/>',
+        f'<text x="{(left + right) / 2:.2f}" y="438" text-anchor="middle" font-family="Microsoft YaHei, SimSun, sans-serif" font-size="14" fill="#172033">距中性层 y / mm</text>',
+        f'<text x="23" y="{(top + bottom) / 2:.2f}" text-anchor="middle" transform="rotate(-90 23 {(top + bottom) / 2:.2f})" font-family="Microsoft YaHei, SimSun, sans-serif" font-size="14" fill="#172033">正应力 Δσ / MPa</text>',
+    ])
+    theory_points = " ".join(
+        f'{x_position(item["y_mm"]):.2f},{y_position(item["stress_theory_MPa"]):.2f}' for item in ordered
+    )
+    experimental_points = " ".join(
+        f'{x_position(item["y_mm"]):.2f},{y_position(item["stress_experimental_MPa"]):.2f}' for item in ordered
+    )
+    svg.extend([
+        f'<polyline points="{theory_points}" fill="none" stroke="#0f766e" stroke-width="3" clip-path="url(#beam-stress-plot-clip)"/>',
+        f'<polyline points="{experimental_points}" fill="none" stroke="#d97706" stroke-width="2.5" stroke-dasharray="7 5" clip-path="url(#beam-stress-plot-clip)"/>',
+    ])
+    for item in ordered:
+        svg.append(
+            f'<circle cx="{x_position(item["y_mm"]):.2f}" cy="{y_position(item["stress_experimental_MPa"]):.2f}" r="5.5" fill="#d97706" stroke="#ffffff" stroke-width="2">'
+            f'<title>测点 {item["gage"]}：y={item["y_mm"]:.2f} mm，Δσ={item["stress_experimental_MPa"]:.2f} MPa</title></circle>'
+        )
+    svg.extend([
+        f'<rect x="{left + 14}" y="{top + 13}" width="238" height="48" rx="6" fill="#ffffff" fill-opacity="0.92" stroke="#cbd5dc"/>',
+        f'<line x1="{left + 28}" y1="{top + 31}" x2="{left + 58}" y2="{top + 31}" stroke="#0f766e" stroke-width="3"/>',
+        f'<text x="{left + 66}" y="{top + 35}" font-family="Microsoft YaHei, SimSun, sans-serif" font-size="12" fill="#354052">理论曲线</text>',
+        f'<line x1="{left + 139}" y1="{top + 31}" x2="{left + 169}" y2="{top + 31}" stroke="#d97706" stroke-width="2.5" stroke-dasharray="7 5"/>',
+        f'<text x="{left + 177}" y="{top + 35}" font-family="Microsoft YaHei, SimSun, sans-serif" font-size="12" fill="#354052">实验曲线</text>',
+        '</svg>',
+    ])
+    encoded = base64.b64encode("".join(svg).encode("utf-8")).decode("ascii")
+    return f"data:image/svg+xml;base64,{encoded}"
+
+
 def bending_report_block(data: dict, result: dict) -> str:
-    rows = [[item["gage"], item["y_mm"], item["strain_micro"], item["stress_experimental_MPa"], item["stress_theory_MPa"], item["relative_error_pct"], item["note"]] for item in result["points"]]
+    width_values = data["width_mm"] if isinstance(data["width_mm"], list) else [data["width_mm"]]
+    height_values = data["height_mm"] if isinstance(data["height_mm"], list) else [data["height_mm"]]
+    dimension_count = max(len(width_values), len(height_values))
+    width_values = [*width_values, *([""] * (dimension_count - len(width_values)))]
+    height_values = [*height_values, *([""] * (dimension_count - len(height_values)))]
+    raw_rows = [
+        [f"第 {index + 1} 次", *[report_number(value, 3) for value in row]]
+        for index, row in enumerate(result["raw_readings_micro"])
+    ]
+    raw_rows.append(["平均 $\\bar\\varepsilon$", *[report_number(value, 3) for value in result["mean_readings_micro"]]])
+    points = result["points"]
+    chart = beam_stress_distribution_chart(points)
+    top_surface, bottom_surface = result["poisson_surfaces"]
+    full = result["full_bridge"]
+    iz_m4 = result["Iz_mm4"] * 1e-12
+    exponent = int(math.floor(math.log10(abs(iz_m4))))
+    coefficient = iz_m4 / (10 ** exponent)
+    error_values = [
+        "—" if item["relative_error_pct"] is None else f"{report_number(item['relative_error_pct'], 2)}%"
+        for item in points
+    ]
     return "\n\n".join([
         "## 五、实验数据记录与处理",
-        "### 1. 原始数据（3 号应变片损坏）",
+        "### 1. 原始数据",
+        "单位：$10^{-6}$。每行表示一次重复测量，九列依次对应测点 1、2、3、4、5、7、8、9、10。",
+        markdown_table(["应变片编号", *result["gage_order"]], raw_rows),
+        "试件尺寸：",
+        markdown_table(
+            ["尺寸/mm", *[str(index + 1) for index in range(dimension_count)], "平均"],
+            [
+                ["$h$", *[report_number(value, 3) if value != "" else "—" for value in height_values], report_number(result["height_mm"], 3)],
+                ["$b$", *[report_number(value, 3) if value != "" else "—" for value in width_values], report_number(result["width_mm"], 3)],
+            ],
+        ),
+        "理论计算：",
         (
-            f"试件平均尺寸为 $b={report_number(result['width_mm'], 3)}\\ \\mathrm{{mm}}$、"
-            f"$h={report_number(result['height_mm'], 3)}\\ \\mathrm{{mm}}$，"
-            f"$I_z={report_number(result['Iz_mm4'], 2)}\\ \\mathrm{{mm^4}}$。"
+            "$$\n"
+            "\\Delta\\sigma(y)=\\frac{\\Delta M\\,y}{I_z}"
+            "=\\frac{\\Delta F\\cdot\\frac a2\\,y}{I_z}"
+            f"=\\frac{{{report_number(result['moment_Nmm'], 3)}y}}{{I_z}}\\quad(\\mathrm{{MPa}}).\n"
+            "$$"
+        ),
+        "实验计算：",
+        (
+            "$$\n"
+            "\\Delta\\bar\\sigma(y)=E\\Delta\\bar\\varepsilon(y)"
+            f"={report_number(result['E_MPa'] / 1000.0, 3)}\\times10^3\\Delta\\bar\\varepsilon"
+            "\\quad(\\mathrm{MPa}).\n"
+            "$$"
+        ),
+        (
+            "$$\n"
+            "\\begin{aligned}\n"
+            "I_z&=\\frac{\\bar b\\bar h^3}{12}\\\\\n"
+            f"&=\\frac{{{report_number(result['width_mm'], 3)}\\times({report_number(result['height_mm'], 3)})^3}}{{12}}"
+            f"={report_number(result['Iz_mm4'], 2)}\\ \\mathrm{{mm^4}}\\\\\n"
+            f"&={report_number(coefficient, 4)}\\times10^{{{exponent}}}\\ \\mathrm{{m^4}}.\n"
+            "\\end{aligned}\n"
+            "$$"
         ),
         "### 理论值与实验值比较",
-        markdown_table(["应变片", "$y$/mm", "$\\varepsilon/10^{-6}$", "实验应力/MPa", "理论应力/MPa", "误差/%", "备注"], rows),
+        markdown_table(
+            ["$y$/mm", *[report_number(item["y_mm"], 2) for item in points]],
+            [
+                ["理论 $\\Delta\\sigma(y)$/MPa", *[report_number(item["stress_theory_MPa"], 2) for item in points]],
+                ["实验 $\\Delta\\bar\\sigma(y)$/MPa", *[report_number(item["stress_experimental_MPa"], 2) for item in points]],
+                ["相对误差", *error_values],
+            ],
+        ),
+        "$y=0$ 处理论应力为零，因此该点相对误差不定义。",
         "### 2. $y-\\Delta\\sigma$ 曲线",
-        "除损坏测点外，表中实验应力可直接用于绘制 $y-\\Delta\\sigma$ 曲线。",
-        "### 3. 验证单向受力假设",
+        f"![截面高度—弯曲正应力曲线]({chart})",
         (
-            f"上下表面测得泊松比的平均值为 $\\mu={report_number(result['mu_mean'], 4)}$，"
-            f"与给定值的相对误差为 {report_number(result['mu_error_pct'], 2)}%。"
-            f"全桥显示值折算的最大弯曲正应变为 {report_number(result['full_bridge']['max_strain_micro'], 2)}×10⁻⁶。"
+            f"实验曲线线性拟合的 $R^2={report_number(result['stress_fit']['r2'], 6)}$，"
+            "实验点与理论直线总体吻合。"
+        ),
+        "### 3. 验证单向受力假设",
+        "上表面：",
+        (
+            "$$\n"
+            f"\\mu_1=\\left|\\frac{{{report_number(top_surface['transverse_micro'], 3)}}}"
+            f"{{{report_number(top_surface['longitudinal_micro'], 3)}}}\\right|"
+            f"={report_number(top_surface['mu'], 3)}.\n"
+            "$$"
+        ),
+        "下表面：",
+        (
+            "$$\n"
+            f"\\mu_2=\\left|\\frac{{{report_number(bottom_surface['transverse_micro'], 3)}}}"
+            f"{{{report_number(bottom_surface['longitudinal_micro'], 3)}}}\\right|"
+            f"={report_number(bottom_surface['mu'], 3)}.\n"
+            "$$"
+        ),
+        "平均值：",
+        (
+            "$$\n"
+            f"\\bar\\mu=\\frac{{\\mu_1+\\mu_2}}{{2}}={report_number(result['mu_mean'], 3)}.\n"
+            "$$"
+        ),
+        "相对误差：",
+        (
+            "$$\n"
+            "\\eta=\\left|\\frac{\\bar\\mu-\\mu_0}{\\mu_0}\\right|\\times100\\%"
+            f"={report_number(result['mu_error_pct'], 2)}\\%.\n"
+            "$$"
         ),
         "## 六、实验结论",
-        "实测弯曲正应力沿截面高度近似呈线性分布，并在中性层附近接近零，符合平面假设和单向受力假设。",
+        (
+            "九个测点的重复读数经平均后，纵向正应力沿截面高度近似呈线性分布，"
+            "并在中性层附近接近零，符合平面假设。"
+            f"上下表面测得的泊松比分别为 {report_number(top_surface['mu'], 3)} 和 "
+            f"{report_number(bottom_surface['mu'], 3)}，平均值为 {report_number(result['mu_mean'], 3)}，"
+            f"与给定值 {report_number(result['mu_reference'], 3)} 的相对误差为 "
+            f"{report_number(result['mu_error_pct'], 2)}%，实验结果支持单向受力假设。"
+            f"全桥显示值为 ${report_number(full['mean_reading_micro'], 3)}\\times10^{{-6}}$，"
+            "对应最大弯曲正应变为"
+        ),
+        (
+            "$$\n"
+            f"\\varepsilon_{{\\max}}=\\frac{{{report_number(full['mean_reading_micro'], 3)}}}"
+            f"{{{report_number(full['display_factor'], 3)}}}\\times10^{{-6}}"
+            f"={report_number(full['max_strain_micro'], 3)}\\times10^{{-6}},\n"
+            "$$"
+        ),
+        "与表面单点测量结果一致。",
     ])
 
 
 def deformation_report_blocks(data: dict, result: dict) -> dict[str, str]:
     simple = result["simply_supported"]
     cantilever = result["cantilever"]
+    cantilever_input = data["cantilever"]
     curve_rows = [[row.get("x_mm"), row.get("deflection_mm")] for row in data["simply_supported"].get("curve_points", [])]
     simple_block = "\n\n".join([
         "## 五、实验结果处理",
@@ -1190,13 +1470,78 @@ def deformation_report_blocks(data: dict, result: dict) -> dict[str, str]:
         "### 4. 挠曲线",
         markdown_table(["位置 $x$/mm", "挠度/mm"], curve_rows),
     ])
+    width_values = cantilever_input["width_mm"] if isinstance(cantilever_input["width_mm"], list) else [cantilever_input["width_mm"]]
+    height_values = cantilever_input["height_mm"] if isinstance(cantilever_input["height_mm"], list) else [cantilever_input["height_mm"]]
+    dimension_count = max(len(width_values), len(height_values))
+    width_values = [*width_values, *([""] * (dimension_count - len(width_values)))]
+    height_values = [*height_values, *([""] * (dimension_count - len(height_values)))]
+    repeat_headers = [str(index + 1) for index in range(len(cantilever["raw_strain_readings_micro"]))]
+    strain_rows = [
+        [
+            "第 1 组 $\\varepsilon_1$",
+            *[report_number(value, 3) for value in cantilever["strain_group_1_micro"]],
+            report_number(cantilever["mean_strain_group_1_micro"], 3),
+        ],
+        [
+            "第 2 组 $\\varepsilon_2$",
+            *[report_number(value, 3) for value in cantilever["strain_group_2_micro"]],
+            report_number(cantilever["mean_strain_group_2_micro"], 3),
+        ],
+        [
+            "$\\Delta\\varepsilon=\\varepsilon_1-\\varepsilon_2$",
+            *[report_number(value, 3) for value in cantilever["strain_differences_micro"]],
+            report_number(cantilever["strain_difference_micro"], 3),
+        ],
+    ]
+    wz_m3 = cantilever["Wz_mm3"] * 1e-9
+    wz_exponent = int(math.floor(math.log10(abs(wz_m3))))
+    wz_coefficient = wz_m3 / (10 ** wz_exponent)
     cantilever_block = "\n\n".join([
         "## 五、实验数据处理",
         "### 1. 原始数据",
+        "试件尺寸：",
+        markdown_table(
+            ["尺寸/mm", *[str(index + 1) for index in range(dimension_count)], "平均"],
+            [
+                ["$b$", *[report_number(value, 3) if value != "" else "—" for value in width_values], report_number(cantilever["width_mm"], 3)],
+                ["$h$", *[report_number(value, 3) if value != "" else "—" for value in height_values], report_number(cantilever["height_mm"], 3)],
+            ],
+        ),
         (
-            f"悬臂梁抗弯截面系数 $W_z={report_number(cantilever['Wz_mm3'], 3)}\\ \\mathrm{{mm^3}}$，"
-            f"两位置应变差为 {report_number(cantilever['strain_difference_micro'], 3)}×10⁻⁶，"
-            f"计算得到金属块质量 $m={report_number(cantilever['mass_kg'], 4)}\\ \\mathrm{{kg}}$。"
+            f"两加载位置间距 $l_{{12}}={report_number(cantilever['position_spacing_mm'], 3)}\\ \\mathrm{{mm}}$。"
+        ),
+        (
+            "$$\n"
+            "\\begin{aligned}\n"
+            "W_z&=\\frac{\\bar b\\bar h^2}{6}\\\\\n"
+            f"&={report_number(cantilever['Wz_mm3'], 3)}\\ \\mathrm{{mm^3}}"
+            f"={report_number(wz_coefficient, 4)}\\times10^{{{wz_exponent}}}\\ \\mathrm{{m^3}}.\n"
+            "\\end{aligned}\n"
+            "$$"
+        ),
+        "以下两组均为直接输入的原始应变读数，差值由程序在数据处理过程中计算，单位为 $10^{-6}$。",
+        markdown_table(["测量项", *repeat_headers, "平均"], strain_rows),
+        (
+            "$$\n"
+            "\\Delta\\bar\\varepsilon=\\bar\\varepsilon_1-\\bar\\varepsilon_2"
+            f"=({report_number(cantilever['mean_strain_group_1_micro'], 3)}"
+            f"-{report_number(cantilever['mean_strain_group_2_micro'], 3)})\\times10^{{-6}}"
+            f"={report_number(cantilever['strain_difference_micro'], 3)}\\times10^{{-6}}.\n"
+            "$$"
+        ),
+        "金属块质量：",
+        (
+            "$$\n"
+            "\\begin{aligned}\n"
+            "m&=\\frac{E\\Delta\\bar\\varepsilon W_z}{l_{12}g}\\\\\n"
+            f"&=\\frac{{{report_number(cantilever['E_MPa'] / 1000.0, 3)}\\times10^9"
+            f"\\times{report_number(cantilever['strain_difference_micro'], 3)}\\times10^{{-6}}"
+            f"\\times{report_number(wz_coefficient, 4)}\\times10^{{{wz_exponent}}}}}"
+            f"{{({report_number(cantilever['position_spacing_mm'] / 1000.0, 4)})"
+            f"\\times{report_number(cantilever['gravity_m_s2'], 3)}}}\\\\\n"
+            f"&={report_number(cantilever['mass_kg'], 4)}\\ \\mathrm{{kg}}.\n"
+            "\\end{aligned}\n"
+            "$$"
         ),
         "## 六、实验结论",
         (
@@ -1209,28 +1554,55 @@ def deformation_report_blocks(data: dict, result: dict) -> dict[str, str]:
 
 
 def bending_torsion_report_block(data: dict, result: dict) -> str:
+    surface_labels = {"upper": "上表面", "lower": "下表面"}
     rows = []
     for item in result["surface_results"]:
         exp = item["experimental"]
         theory = item["theoretical"]
-        rows.append([item["surface"], exp["sigma_1_MPa"], theory["sigma_1_MPa"], exp["sigma_2_MPa"], theory["sigma_2_MPa"], exp["principal_angle_deg"], theory["principal_angle_deg"]])
+        rows.append([surface_labels.get(item["surface"], item["surface"]), exp["sigma_1_MPa"], theory["sigma_1_MPa"], exp["sigma_2_MPa"], theory["sigma_2_MPa"], exp["principal_angle_deg"], theory["principal_angle_deg"]])
     rosette_rows = []
-    for surface_name, surface_data in data["rosettes"].items():
-        rosette_rows.extend([
-            [surface_name, "$+45^\\circ$", *surface_data["epsilon_p45_micro"]],
-            [surface_name, "$0^\\circ$", *surface_data["epsilon_0_micro"]],
-            [surface_name, "$-45^\\circ$", *surface_data["epsilon_m45_micro"]],
-        ])
+    for surface_result in result["surface_results"]:
+        for point in surface_result["measurement_points"]:
+            angle = point["angle_deg"]
+            angle_text = f"{report_number(angle, 3)}^\\circ"
+            if angle > 0:
+                angle_text = "+" + angle_text
+            rosette_rows.append([
+                surface_labels.get(surface_result["surface"], surface_result["surface"]),
+                f"${angle_text}$",
+                *point["readings_micro"],
+                report_number(point["mean_strain_micro"], 3),
+            ])
+    repeat_headers = [f"第{index + 1}次" for index in range(result["rosette_repeat_count"])]
+    half_readings = data["half_bridge_bending"]["readings_micro"]
+    full_readings = data["full_bridge_torsion"]["readings_micro"]
     return "\n\n".join([
         "## 五、实验数据记录",
         "### 1. 直径",
         f"圆轴直径测量值为 {report_value(data['diameter_mm'])} mm，平均直径 $d={report_number(result['diameter_mm'], 3)}\\ \\mathrm{{mm}}$。",
         "### 2. 四分之一桥",
-        markdown_table(["表面", "方向", "第1次", "第2次", "第3次", "第4次"], rosette_rows),
+        (
+            "三个测量点的方位角按实际布片方向输入；不修改时默认采用当前的 "
+            "$+45^\\circ$、$0^\\circ$、$-45^\\circ$。程序按任意三方向应变转换式求解：\n\n"
+            "$$\n"
+            "\\varepsilon_\\alpha=\\frac{\\varepsilon_x+\\varepsilon_y}{2}"
+            "+\\frac{\\varepsilon_x-\\varepsilon_y}{2}\\cos2\\alpha"
+            "-\\frac{\\gamma_{xy}}{2}\\sin2\\alpha.\n"
+            "$$"
+        ),
+        markdown_table(["表面", "实际方位角", *repeat_headers, "平均"], rosette_rows),
         "### 3. 半桥",
-        markdown_table(["测量项", "第1次", "第2次", "第3次", "第4次"], [["弯矩桥路显示值", *data["half_bridge_bending"]["readings_micro"]]]),
+        "桥路组合固定为当前的上、下表面 $0^\\circ$ 应变片组合。",
+        markdown_table(
+            ["测量项", *[f"第{index + 1}次" for index in range(len(half_readings))], "平均"],
+            [["弯矩桥路显示值", *half_readings, report_number(result["bending_bridge"]["mean_display_micro"], 3)]],
+        ),
         "### 4. 全桥",
-        markdown_table(["测量项", "第1次", "第2次", "第3次", "第4次"], [["扭矩桥路显示值", *data["full_bridge_torsion"]["readings_micro"]]]),
+        "桥路组合固定为当前的 $\\pm45^\\circ$ 应变片扭转全桥。",
+        markdown_table(
+            ["测量项", *[f"第{index + 1}次" for index in range(len(full_readings))], "平均"],
+            [["扭矩桥路显示值", *full_readings, report_number(result["torsion_bridge"]["mean_display_micro"], 3)]],
+        ),
         "## 六、实验数据处理",
         "### 1. 实验点主应力大小、方向角，并与理论值比较",
         markdown_table(["表面", "$\\sigma_1$实验/MPa", "$\\sigma_1$理论/MPa", "$\\sigma_2$实验/MPa", "$\\sigma_2$理论/MPa", "主方向实验/(°)", "主方向理论/(°)"], rows),
@@ -1404,7 +1776,7 @@ def merge_report_markdown(exp: dict, data: dict, result: dict, metadata: dict) -
     source_path = REPORT_SOURCE_ROOT / exp["report_file"]
     source = replace_report_metadata(source_path.read_text(encoding="utf-8"), metadata)
     source = source.replace("](images/", "](/report-images/")
-    if is_reference_sample(exp, data) and exp["id"] != "B041":
+    if is_reference_sample(exp, data) and exp["id"] not in {"B041", "B051"}:
         return correct_reference_sample_report(exp, source, result)
     blocks = report_block(exp["id"], data, result)
 

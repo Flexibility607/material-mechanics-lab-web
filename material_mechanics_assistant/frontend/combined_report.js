@@ -13,7 +13,7 @@
     };
 
     const els = {};
-    const storageKey = "material-mechanics:auto-report:v4";
+    const storageKey = "material-mechanics:auto-report:v7";
     const metadataInputMap = {
         theory_teacher: "theoryTeacher",
         experiment_teachers: "experimentTeachers",
@@ -49,8 +49,6 @@
         width_mm: "宽度测量值 / mm",
         thickness_mm: "厚度测量值 / mm",
         height_mm: "高度测量值 / mm",
-        axial_channels: "轴向应变通道索引",
-        transverse_channels: "横向应变通道索引",
         runs: "重复加载",
         loads_kN: "载荷序列 / kN",
         readings_micro: "应变读数 / 10⁻⁶",
@@ -69,6 +67,7 @@
         mu: "泊松比 μ",
         delta_force_kN: "载荷增量 ΔF / kN",
         load_spacing_mm: "加载点间距 a / mm",
+        point_readings_micro: "九测点重复读数 / 10⁻⁶",
         longitudinal_points: "纵向应变测点",
         gage: "应变片编号",
         y_mm: "距中性层 y / mm",
@@ -92,19 +91,17 @@
         x_mm: "位置 x / mm",
         deflection_mm: "挠度 / mm",
         position_spacing_mm: "两加载位置间距 l₁₂ / mm",
-        strain_position_1_micro: "位置 1 应变 / 10⁻⁶",
-        strain_position_2_micro: "位置 2 应变 / 10⁻⁶",
+        strain_readings_micro: "两组原始应变读数 / 10⁻⁶",
         gravity_m_s2: "重力加速度 g / m·s⁻²",
         bending_arm_mm: "弯曲力臂 Lₘ / mm",
         torsion_arm_mm: "扭转力臂 Lₜ / mm",
-        rosettes: "三向应变花",
+        rosettes: "四分之一桥三向测点",
         upper: "上表面",
         lower: "下表面",
-        epsilon_0_micro: "0° 应变 / 10⁻⁶",
-        epsilon_p45_micro: "+45° 应变 / 10⁻⁶",
-        epsilon_m45_micro: "−45° 应变 / 10⁻⁶",
-        half_bridge_bending: "弯矩半桥",
-        full_bridge_torsion: "扭矩全桥",
+        measurement_points: "测量点与方位",
+        angle_deg: "测点方位角 θ / (°)",
+        half_bridge_bending: "弯矩半桥（固定：上 0°−下 0°）",
+        full_bridge_torsion: "扭矩全桥（固定：±45° 组合）",
         h_mm: "截面尺寸 h / mm",
         b_mm: "截面尺寸 b / mm",
         quarter_bridge_epsilon_a_micro: "四分之一桥 εₐ / 10⁻⁶",
@@ -114,10 +111,11 @@
     };
 
     const help = {
-        axial_channels: "通道从 0 开始编号。本报告轴向为第 1、4 通道，因此填写 0, 3。",
-        transverse_channels: "本报告横向为第 2、3 通道，因此填写 1, 2。",
         display_factor: "仪器显示值除以该系数得到实际应变；半桥通常为 2，全桥弯曲通常为 4。",
         reading_to_gamma_factor: "半桥读数已是 γ 时填 1；全桥显示为 2γ 时填 0.5。",
+        point_readings_micro: "每行是一次重复测量，固定 9 列依次对应测点 1、2、3、4、5、7、8、9、10。",
+        strain_readings_micro: "每行是一次重复测量，只输入第 1 组和第 2 组原始应变；两组差值由程序在数据处理中计算。",
+        angle_deg: "相对于圆轴 x 方向输入实际方位角；不修改时默认采用当前的 +45°、0°、−45°。",
         readings_micro: "矩阵每行对应一个加载级，行内各数对应应变通道。"
     };
 
@@ -181,6 +179,7 @@
         state.catalog.experiments.forEach(exp => {
             if (!state.data[exp.key]) state.data[exp.key] = clone(sample[exp.key]);
         });
+        removeLegacyElasticChannelSelectors();
         const ids = state.catalog.experiments.map(exp => exp.id);
         if (!ids.includes(state.selectedId)) state.selectedId = ids[0];
         configureMetadataDefaults();
@@ -239,8 +238,12 @@
 
     function renderCurrentForm() {
         const exp = currentExperiment();
+        removeLegacyElasticChannelSelectors();
         const data = state.data[exp.key];
         els.rawDataTitle.textContent = `${exp.id} ${exp.title}原始数据`;
+        els.rawDataHint.textContent = exp.id === "B031"
+            ? "只需输入四个通道读数；系统会按全程数值相近程度自动两两配对并识别轴向、横向应变"
+            : "数列与矩阵可在表格中逐项增删，也可通过 CSV 批量编辑";
         els.rawInputForm.innerHTML = renderObject(data, [], exp.title, 0);
         els.rawInputForm.querySelectorAll("[data-input-path]").forEach(input => {
             input.addEventListener("input", handleDataInput);
@@ -249,6 +252,13 @@
         els.rawInputForm.querySelectorAll("[data-array-action]").forEach(button => {
             button.addEventListener("click", handleArrayAction);
         });
+    }
+
+    function removeLegacyElasticChannelSelectors() {
+        const elastic = state.data.elastic_constants;
+        if (!elastic || typeof elastic !== "object") return;
+        delete elastic.axial_channels;
+        delete elastic.transverse_channels;
     }
 
     function renderObject(object, path, title, depth) {
@@ -276,7 +286,8 @@
                 <div class="object-title">${escapeHtml(title)}</div>
                 <div class="array-entries">
                     ${items.map((item, index) => {
-                        const itemTitle = item.material || item.surface || item.gage || `第 ${index + 1} 组`;
+                        const itemTitle = item.material || item.surface || item.gage
+                            || (typeof item.angle_deg === "number" ? `方位 ${item.angle_deg > 0 ? "+" : ""}${item.angle_deg}°` : `第 ${index + 1} 组`);
                         return `
                             <div class="array-entry">
                                 <div class="object-title">${escapeHtml(String(itemTitle))}</div>
@@ -324,23 +335,25 @@
         const encodedArrayPath = escapeHtml(JSON.stringify(path));
         const isMatrix = value.length > 0 && Array.isArray(value[0]);
         if (isMatrix) {
-            const columnCount = Math.max(1, ...value.map(row => row.length));
+            const fixedConfig = fixedMatrixConfig(path);
+            const fixedHeaders = fixedConfig?.headers || null;
+            const columnCount = fixedHeaders?.length || Math.max(1, ...value.map(row => row.length));
             return `
                 <div class="wide-field array-field">
                     <div class="array-field-title">${escapeHtml(label)}</div>
                     <div class="array-table-wrap">
                         <table class="array-data-table">
                             <thead><tr>
-                                <th>加载级</th>
+                                <th>${fixedConfig ? fixedConfig.rowHeader : "加载级"}</th>
                                 ${Array.from({ length: columnCount }, (_, column) => `
-                                    <th>第 ${column + 1} 列${columnCount > 1 ? `<button type="button" class="table-icon-button" data-array-action="delete-column" data-array-path="${encodedArrayPath}" data-array-column="${column}" aria-label="删除第 ${column + 1} 列">×</button>` : ""}</th>
+                                    <th>${fixedHeaders ? escapeHtml(fixedHeaders[column]) : `第 ${column + 1} 列${columnCount > 1 ? `<button type="button" class="table-icon-button" data-array-action="delete-column" data-array-path="${encodedArrayPath}" data-array-column="${column}" aria-label="删除第 ${column + 1} 列">×</button>` : ""}`}</th>
                                 `).join("")}
                                 <th>操作</th>
                             </tr></thead>
                             <tbody>
                                 ${value.map((row, rowIndex) => `
                                     <tr>
-                                        <th>${rowIndex + 1}</th>
+                                        <th>${fixedHeaders ? `第 ${rowIndex + 1} 次` : rowIndex + 1}</th>
                                         ${Array.from({ length: columnCount }, (_, columnIndex) => renderArrayCell(row[columnIndex] ?? 0, [...path, rowIndex, columnIndex], `${label} 第 ${rowIndex + 1} 行第 ${columnIndex + 1} 列`)).join("")}
                                         <td><button type="button" class="table-delete-button" data-array-action="delete-row" data-array-path="${encodedArrayPath}" data-array-row="${rowIndex}" ${value.length <= 1 ? "disabled" : ""}>删除</button></td>
                                     </tr>
@@ -350,7 +363,7 @@
                     </div>
                     <div class="array-table-actions">
                         <button type="button" data-array-action="add-row" data-array-path="${encodedArrayPath}">＋ 添加一行</button>
-                        <button type="button" data-array-action="add-column" data-array-path="${encodedArrayPath}">＋ 添加一列</button>
+                        ${fixedHeaders ? "" : `<button type="button" data-array-action="add-column" data-array-path="${encodedArrayPath}">＋ 添加一列</button>`}
                     </div>
                     ${helpText}
                 </div>
@@ -381,6 +394,23 @@
         `;
     }
 
+    function fixedMatrixConfig(path) {
+        const expId = currentExperiment().id;
+        if (expId === "B051" && path.length === 1 && path[0] === "point_readings_micro") {
+            return {
+                rowHeader: "测量次数",
+                headers: ["测点 1", "测点 2", "测点 3", "测点 4", "测点 5", "测点 7", "测点 8", "测点 9", "测点 10"]
+            };
+        }
+        if (expId === "B061" && path.length === 2 && path[0] === "cantilever" && path[1] === "strain_readings_micro") {
+            return {
+                rowHeader: "重复次数",
+                headers: ["第 1 组 ε₁", "第 2 组 ε₂"]
+            };
+        }
+        return null;
+    }
+
     function renderArrayCell(value, path, ariaLabel) {
         const encodedPath = escapeHtml(JSON.stringify(path));
         const kind = typeof value === "number" ? "number" : "text";
@@ -407,7 +437,10 @@
         if (action === "add-item") target.push(defaultArrayValue(target));
         if (action === "delete-item" && target.length > 1) target.splice(Number(button.dataset.arrayRow), 1);
         if (action === "add-row") {
-            const columns = Math.max(1, ...target.map(row => Array.isArray(row) ? row.length : 0));
+            const fixedColumns = fixedMatrixConfig(path)?.headers.length;
+            const columns = fixedColumns
+                ? fixedColumns
+                : Math.max(1, ...target.map(row => Array.isArray(row) ? row.length : 0));
             target.push(Array.from({ length: columns }, () => defaultMatrixValue(target)));
         }
         if (action === "delete-row" && target.length > 1) target.splice(Number(button.dataset.arrayRow), 1);
@@ -848,6 +881,12 @@
             if (!valid.length) return;
             const rowCount = Math.max(...valid.map(([row]) => row));
             const columnCount = Math.max(...valid.map(([, column]) => column));
+            if (exp.id === "B051" && group.path.length === 1 && group.path[0] === "point_readings_micro" && columnCount !== 9) {
+                throw new Error("B051 九测点读数必须是 9 列，依次对应测点 1、2、3、4、5、7、8、9、10");
+            }
+            if (exp.id === "B061" && group.path.length === 2 && group.path[0] === "cantilever" && group.path[1] === "strain_readings_micro" && columnCount !== 2) {
+                throw new Error("B061 悬臂梁原始应变必须是 2 列，依次对应第 1 组和第 2 组读数");
+            }
             const matrix = Array.from({ length: rowCount }, () => Array(columnCount).fill(0));
             valid.forEach(([row, column, value]) => { matrix[row - 1][column - 1] = value; });
             setPath(data, group.path, matrix);
