@@ -84,12 +84,12 @@
         delta_load_N: "载荷增量 ΔP / N",
         central_deflection_mm: "跨中挠度重复值 / mm",
         angle_indicator_delta_mm: "转角百分表位移 / mm",
-        angle_arm_mm: "转角测量臂长 / mm",
+        angle_arm_mm: "转角测量臂长 a 的重复测量值 / mm",
         reciprocity_12_mm: "互等位移 ΔW₁₂ / mm",
         reciprocity_21_mm: "互等位移 ΔW₂₁ / mm",
         curve_points: "挠曲线测点",
         x_mm: "位置 x / mm",
-        deflection_mm: "挠度 / mm",
+        deflection_mm: "挠度重复测量值 / mm",
         position_spacing_mm: "两加载位置间距 l₁₂ / mm",
         strain_readings_micro: "两组原始应变读数 / 10⁻⁶",
         gravity_m_s2: "重力加速度 g / m·s⁻²",
@@ -115,6 +115,8 @@
         reading_to_gamma_factor: "半桥读数已是 γ 时填 1；全桥显示为 2γ 时填 0.5。",
         point_readings_micro: "每行是一次重复测量，固定 9 列依次对应测点 1、2、3、4、5、7、8、9、10。",
         strain_readings_micro: "每行是一次重复测量，只输入第 1 组和第 2 组原始应变；两组差值由程序在数据处理中计算。",
+        angle_arm_mm: "输入臂长 a 的各次原始测量值，程序取平均值后参与支点转角计算；内置样例仅能核验平均值 150.0 mm。",
+        deflection_mm: "同一位置可输入多次挠度测量值，程序逐点求平均并用于挠曲线表格。",
         angle_deg: "相对于圆轴 x 方向输入实际方位角；不修改时默认采用当前的 +45°、0°、−45°。",
         readings_micro: "矩阵每行对应一个加载级，行内各数对应应变通道。"
     };
@@ -180,9 +182,34 @@
             if (!state.data[exp.key]) state.data[exp.key] = clone(sample[exp.key]);
         });
         removeLegacyElasticChannelSelectors();
+        migrateBeamDeformationData(state.data.beam_deformation);
         const ids = state.catalog.experiments.map(exp => exp.id);
         if (!ids.includes(state.selectedId)) state.selectedId = ids[0];
         configureMetadataDefaults();
+    }
+
+    function migrateBeamDeformationData(data) {
+        if (!data || typeof data !== "object") return data;
+        [data.simply_supported, data.cantilever].forEach(section => {
+            if (!section || typeof section !== "object") return;
+            if (!("thickness_mm" in section) && "height_mm" in section) {
+                section.thickness_mm = section.height_mm;
+            }
+            delete section.height_mm;
+        });
+        const simple = data.simply_supported;
+        if (!simple || typeof simple !== "object") return data;
+        if (simple.angle_arm_mm != null && !Array.isArray(simple.angle_arm_mm)) {
+            simple.angle_arm_mm = [simple.angle_arm_mm];
+        }
+        if (Array.isArray(simple.curve_points)) {
+            simple.curve_points.forEach(point => {
+                if (point && point.deflection_mm != null && !Array.isArray(point.deflection_mm)) {
+                    point.deflection_mm = [point.deflection_mm];
+                }
+            });
+        }
+        return data;
     }
 
     function metadataDefaults() {
@@ -287,6 +314,7 @@
                 <div class="array-entries">
                     ${items.map((item, index) => {
                         const itemTitle = item.material || item.surface || item.gage
+                            || (typeof item.x_mm === "number" ? `位置 x = ${item.x_mm} mm` : "")
                             || (typeof item.angle_deg === "number" ? `方位 ${item.angle_deg > 0 ? "+" : ""}${item.angle_deg}°` : `第 ${index + 1} 组`);
                         return `
                             <div class="array-entry">
@@ -854,16 +882,20 @@
         const series = new Map();
         const matrices = new Map();
         records.forEach(record => {
-            const path = record.path.split(".").filter(Boolean).map(part => /^\d+$/.test(part) ? Number(part) : part);
+            const path = canonicalCsvPath(
+                exp,
+                record.path.split(".").filter(Boolean).map(part => /^\d+$/.test(part) ? Number(part) : part)
+            );
             if (!path.length) return;
+            const pathKey = csvPath(path);
             if (record.type === "series") {
-                if (!series.has(record.path)) series.set(record.path, { path, values: [] });
-                series.get(record.path).values.push([Number(record.row), csvValue(record.value, "series")]);
+                if (!series.has(pathKey)) series.set(pathKey, { path, values: [] });
+                series.get(pathKey).values.push([Number(record.row), csvValue(record.value, "series")]);
                 return;
             }
             if (record.type === "matrix") {
-                if (!matrices.has(record.path)) matrices.set(record.path, { path, values: [] });
-                matrices.get(record.path).values.push([Number(record.row), Number(record.column), csvValue(record.value, "matrix")]);
+                if (!matrices.has(pathKey)) matrices.set(pathKey, { path, values: [] });
+                matrices.get(pathKey).values.push([Number(record.row), Number(record.column), csvValue(record.value, "matrix")]);
                 return;
             }
             const current = getPath(data, path);
@@ -891,7 +923,18 @@
             valid.forEach(([row, column, value]) => { matrix[row - 1][column - 1] = value; });
             setPath(data, group.path, matrix);
         });
-        state.data[exp.key] = data;
+        state.data[exp.key] = exp.id === "B061" ? migrateBeamDeformationData(data) : data;
+    }
+
+    function canonicalCsvPath(exp, path) {
+        if (
+            exp.id === "B061" && path.length === 2
+            && (path[0] === "simply_supported" || path[0] === "cantilever")
+            && path[1] === "height_mm"
+        ) {
+            return [path[0], "thickness_mm"];
+        }
+        return path;
     }
 
     function csvValue(value, type, current) {

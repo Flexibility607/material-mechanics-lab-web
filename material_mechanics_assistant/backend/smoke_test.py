@@ -35,8 +35,13 @@ def main():
         payload = calculate_auto_report(
             exp["id"], sample["experiments"][exp["key"]], sample.get("metadata", {})
         )
-        if "实验结论" not in payload["report_markdown"]:
+        if exp["id"] != "B061" and "实验结论" not in payload["report_markdown"]:
             raise AssertionError(f"{exp['id']} 自动报告缺少实验结论")
+        if exp["id"] == "B061":
+            if "## 六、实验结论" in payload["report_markdown"]:
+                raise AssertionError("B061 自动报告不应包含原扫描没有的实验结论章节")
+            if "## 六、思考题" not in payload["report_markdown"]:
+                raise AssertionError("B061 自动报告未按原扫描顺序进入六、思考题")
         report = payload["report_markdown"]
         for expected in (
             "- 理论课程教师：mqc老师",
@@ -86,6 +91,10 @@ def main():
         if exp["id"] == "B061":
             for expected in (
                 "两加载位置的原始应变数据如下",
+                "| 次数 | $x_1$ 处 $\\Delta W$/mm | $x_2$ 处 $\\Delta W$/mm | $x_3$ 处 $\\Delta W$/mm |",
+                "| 1 | -0.381 | -0.502 | -0.556 |",
+                "| 4 | -0.379 | -0.503 | -0.556 |",
+                "| 平均 | -0.381 | -0.503 | -0.560 |",
                 "| 第 1 组 $\\varepsilon_1$ | 151 | 151 | 152 | 151 | 151.25 |",
                 "| 第 2 组 $\\varepsilon_2$ | 66 | 65 | 65 | 64 | 65 |",
                 "| $\\Delta\\varepsilon=\\varepsilon_1-\\varepsilon_2$ | 85 | 86 | 87 | 87 | 86.25 |",
@@ -99,12 +108,21 @@ def main():
                 raise AssertionError("B061 悬臂梁输入不是若干行 2 列的两组原始应变")
             mutated_data = __import__("json").loads(__import__("json").dumps(sample["experiments"][exp["key"]]))
             mutated_data["cantilever"]["strain_readings_micro"][0][0] = 150
+            mutated_data["simply_supported"]["curve_points"][0]["deflection_mm"][0] = -0.4
+            mutated_data["simply_supported"]["angle_arm_mm"][0] = 147
             mutated_report = calculate_auto_report(exp["id"], mutated_data, sample.get("metadata", {}))["report_markdown"]
             for expected in (
-                "以下两组均为直接输入的原始应变读数，差值由程序在数据处理过程中计算",
+                "转角测量臂长 $a$/mm",
+                "| 转角测量臂长 $a$/mm | 147.0 | 150.0 | 150.0 | 149.0 |",
+                "\\bar a=149.0\\ \\mathrm{mm}",
+                "| 1 | -0.400 | -0.502 | -0.556 |",
+                "| 平均 | -0.386 | -0.503 | -0.560 |",
+                "![简支梁挠曲线](data:image/svg+xml;base64,",
+                "两加载位置的原始应变数据如下",
                 "| 第 1 组 $\\varepsilon_1$ | 150 | 151 | 152 | 151 | 151 |",
                 "| $\\Delta\\varepsilon=\\varepsilon_1-\\varepsilon_2$ | 84 | 86 | 87 | 87 | 86 |",
                 "\\Delta\\bar\\varepsilon=\\bar\\varepsilon_1-\\bar\\varepsilon_2",
+                "## 六、思考题",
             ):
                 if expected not in mutated_report:
                     raise AssertionError(f"B061 动态报告缺少：{expected}")

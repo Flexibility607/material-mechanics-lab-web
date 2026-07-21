@@ -75,6 +75,17 @@ class CalculatorRegressionTest(unittest.TestCase):
         self.assertAlmostEqual(point_3["stress_experimental_MPa"], -26.145, places=3)
         self.assertAlmostEqual(bending["full_bridge"]["max_strain_micro"], -156.0, places=2)
         self.assertAlmostEqual(deformation["simply_supported"]["deflection_theoretical_mm"], 0.5565, places=3)
+        self.assertAlmostEqual(deformation["simply_supported"]["thickness_mm"], 8.9633, places=3)
+        self.assertAlmostEqual(deformation["simply_supported"]["angle_arm_mm"], 150.0, places=3)
+        self.assertEqual(
+            deformation["simply_supported"]["curve_points"][0]["deflection_readings_mm"],
+            [-0.381, -0.383, -0.381, -0.379],
+        )
+        self.assertAlmostEqual(
+            deformation["simply_supported"]["curve_points"][1]["deflection_mm"],
+            -0.5025,
+            places=4,
+        )
         self.assertEqual(
             deformation["cantilever"]["raw_strain_readings_micro"],
             [[151.0, 66.0], [151.0, 65.0], [152.0, 65.0], [151.0, 64.0]],
@@ -99,6 +110,58 @@ class CalculatorRegressionTest(unittest.TestCase):
         )["experiments"]["beam_deformation"]
         data["cantilever"]["strain_readings_micro"][0].pop()
         with self.assertRaisesRegex(InputError, "必须输入第 1 组和第 2 组共 2 列原始应变读数"):
+            calculate_beam_deformation(data)
+
+    def test_beam_deformation_accepts_legacy_scalar_and_height_fields(self):
+        data = json.loads(
+            (Path(__file__).resolve().parent / "sample_input.json").read_text(encoding="utf-8")
+        )["experiments"]["beam_deformation"]
+        for section_name in ("simply_supported", "cantilever"):
+            section = data[section_name]
+            section["height_mm"] = section.pop("thickness_mm")
+        data["simply_supported"]["angle_arm_mm"] = 150.0
+        for point in data["simply_supported"]["curve_points"]:
+            point["deflection_mm"] = point["deflection_mm"][0]
+
+        result = calculate_beam_deformation(data)
+
+        self.assertAlmostEqual(result["simply_supported"]["thickness_mm"], 8.9633, places=3)
+        self.assertEqual(
+            result["simply_supported"]["curve_points"][0]["deflection_readings_mm"],
+            [-0.381],
+        )
+
+    def test_beam_deformation_rejects_zero_mean_angle_arm(self):
+        data = json.loads(
+            (Path(__file__).resolve().parent / "sample_input.json").read_text(encoding="utf-8")
+        )["experiments"]["beam_deformation"]
+        data["simply_supported"]["angle_arm_mm"] = [-1.0, 1.0]
+
+        with self.assertRaisesRegex(InputError, "平均值不能为 0"):
+            calculate_beam_deformation(data)
+
+    def test_beam_deformation_uses_mean_angle_arm(self):
+        data = json.loads(
+            (Path(__file__).resolve().parent / "sample_input.json").read_text(encoding="utf-8")
+        )["experiments"]["beam_deformation"]
+        data["simply_supported"]["angle_arm_mm"] = [147.0, 150.0, 150.0]
+
+        result = calculate_beam_deformation(data)["simply_supported"]
+
+        self.assertAlmostEqual(result["angle_arm_mm"], 149.0, places=6)
+        self.assertAlmostEqual(
+            result["theta_experimental_rad"],
+            sum(data["simply_supported"]["angle_indicator_delta_mm"]) / 4.0 / 149.0,
+            places=12,
+        )
+
+    def test_beam_deformation_rejects_empty_curve_readings(self):
+        data = json.loads(
+            (Path(__file__).resolve().parent / "sample_input.json").read_text(encoding="utf-8")
+        )["experiments"]["beam_deformation"]
+        data["simply_supported"]["curve_points"][0]["deflection_mm"] = []
+
+        with self.assertRaisesRegex(InputError, "deflection_mm"):
             calculate_beam_deformation(data)
 
     def test_combined_loading(self):

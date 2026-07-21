@@ -525,23 +525,56 @@ def calculate_beam_deformation(data: dict[str, Any]) -> dict[str, Any]:
     elastic_modulus = average(require(simple, "E_GPa", "beam_deformation.simply_supported")) * 1000.0
     length = average(require(simple, "length_mm", "beam_deformation.simply_supported"))
     width = average(require(simple, "width_mm", "beam_deformation.simply_supported"))
-    height = average(require(simple, "height_mm", "beam_deformation.simply_supported"))
-    inertia = width * height**3 / 12.0
+    simple_thickness_input = simple.get("thickness_mm", simple.get("height_mm"))
+    thickness = average(simple_thickness_input, "beam_deformation.simply_supported.thickness_mm")
+    inertia = width * thickness**3 / 12.0
     delta_p = average(require(simple, "delta_load_N", "beam_deformation.simply_supported"))
     deflection_exp = average(require(simple, "central_deflection_mm", "beam_deformation.simply_supported"))
     deflection_theory = delta_p * length**3 / (48.0 * elastic_modulus * inertia)
     angle_delta = average(require(simple, "angle_indicator_delta_mm", "beam_deformation.simply_supported"))
     angle_arm = average(require(simple, "angle_arm_mm", "beam_deformation.simply_supported"))
+    if angle_arm == 0:
+        raise InputError("beam_deformation.simply_supported.angle_arm_mm 的平均值不能为 0")
     theta_exp = angle_delta / angle_arm
     theta_theory = delta_p * length**2 / (16.0 * elastic_modulus * inertia)
     reciprocity_12 = average(require(simple, "reciprocity_12_mm", "beam_deformation.simply_supported"))
     reciprocity_21 = average(require(simple, "reciprocity_21_mm", "beam_deformation.simply_supported"))
 
+    curve_points: list[dict[str, Any]] = []
+    for point_index, point in enumerate(simple.get("curve_points", [])):
+        if not isinstance(point, dict):
+            raise InputError(
+                f"beam_deformation.simply_supported.curve_points[{point_index}] 必须包含位置和挠度读数"
+            )
+        x_mm = average(
+            require(point, "x_mm", f"beam_deformation.simply_supported.curve_points[{point_index}]"),
+            f"beam_deformation.simply_supported.curve_points[{point_index}].x_mm",
+        )
+        raw_deflection = require(
+            point,
+            "deflection_mm",
+            f"beam_deformation.simply_supported.curve_points[{point_index}]",
+        )
+        deflection_readings = numbers(raw_deflection if isinstance(raw_deflection, list) else [raw_deflection])
+        if not deflection_readings:
+            raise InputError(
+                f"beam_deformation.simply_supported.curve_points[{point_index}].deflection_mm 至少需要一个有效数值"
+            )
+        curve_points.append({
+            "x_mm": x_mm,
+            "deflection_readings_mm": deflection_readings,
+            "deflection_mm": mean(deflection_readings),
+        })
+
     cantilever = require(data, "cantilever", "beam_deformation")
     cantilever_E = average(require(cantilever, "E_GPa", "beam_deformation.cantilever")) * 1000.0
     cantilever_width = average(require(cantilever, "width_mm", "beam_deformation.cantilever"))
-    cantilever_height = average(require(cantilever, "height_mm", "beam_deformation.cantilever"))
-    wz = cantilever_width * cantilever_height**2 / 6.0
+    cantilever_thickness_input = cantilever.get("thickness_mm", cantilever.get("height_mm"))
+    cantilever_thickness = average(
+        cantilever_thickness_input,
+        "beam_deformation.cantilever.thickness_mm",
+    )
+    wz = cantilever_width * cantilever_thickness**2 / 6.0
     raw_strain_readings = require(cantilever, "strain_readings_micro", "beam_deformation.cantilever")
     if not isinstance(raw_strain_readings, list):
         raise InputError("beam_deformation.cantilever.strain_readings_micro 必须是若干行 2 列的矩阵")
@@ -571,25 +604,29 @@ def calculate_beam_deformation(data: dict[str, Any]) -> dict[str, Any]:
 
     return {
         "simply_supported": {
+            "E_MPa": elastic_modulus,
             "length_mm": length,
             "width_mm": width,
-            "height_mm": height,
+            "thickness_mm": thickness,
             "Iz_mm4": inertia,
+            "delta_load_N": delta_p,
             "deflection_experimental_mm": deflection_exp,
             "deflection_theoretical_mm": deflection_theory,
             "deflection_error_pct": relative_error_pct(deflection_exp, deflection_theory),
+            "angle_indicator_delta_mm": angle_delta,
+            "angle_arm_mm": angle_arm,
             "theta_experimental_rad": theta_exp,
             "theta_theoretical_rad": theta_theory,
             "theta_error_pct": relative_error_pct(theta_exp, theta_theory),
             "reciprocity_12_mm": reciprocity_12,
             "reciprocity_21_mm": reciprocity_21,
             "reciprocity_difference_mm": reciprocity_12 - reciprocity_21,
-            "curve_points": simple.get("curve_points", []),
+            "curve_points": curve_points,
         },
         "cantilever": {
             "E_MPa": cantilever_E,
             "width_mm": cantilever_width,
-            "height_mm": cantilever_height,
+            "thickness_mm": cantilever_thickness,
             "Wz_mm3": wz,
             "position_spacing_mm": l12,
             "gravity_m_s2": gravity,

@@ -14,9 +14,9 @@ const exportHook = `
             return [header, ...rows].map(row => row.map(csvCell).join(",")).join("\\r\\n");
         },
         parseCsv,
-        importInto(data, records) {
-            state.catalog = { experiments: [{ id: "TEST", key: "test" }] };
-            state.selectedId = "TEST";
+        importInto(data, records, experimentId = "TEST") {
+            state.catalog = { experiments: [{ id: experimentId, key: "test" }] };
+            state.selectedId = experimentId;
             state.data = { test: clone(data) };
             applyCsvRecords(records);
             return state.data.test;
@@ -62,5 +62,27 @@ const imported = api.importInto(sample, edited);
 assert.equal(imported.width_mm, 21.5);
 assert.deepEqual(Array.from(imported.loads_kN), [2, 10, 14]);
 assert.deepEqual(Array.from(imported.readings_micro, row => Array.from(row)), [[0, 0, 5], [120, -36, 8]]);
+
+const beamData = {
+    simply_supported: {
+        thickness_mm: [8.9, 9.0, 9.1],
+        angle_arm_mm: [150],
+        curve_points: [{ x_mm: 100, deflection_mm: [-0.4, -0.42] }]
+    },
+    cantilever: { thickness_mm: [7.0, 7.1, 7.2] }
+};
+const legacyBeamCsv = [
+    { path: "simply_supported.height_mm", type: "series", row: "1", value: "8.8" },
+    { path: "simply_supported.height_mm", type: "series", row: "2", value: "8.9" },
+    { path: "simply_supported.angle_arm_mm", type: "number", row: "", value: "149.5" },
+    { path: "simply_supported.curve_points.0.deflection_mm", type: "number", row: "", value: "-0.41" },
+    { path: "cantilever.height_mm", type: "series", row: "1", value: "6.9" }
+];
+const migratedBeam = api.importInto(beamData, legacyBeamCsv, "B061");
+assert.deepEqual(Array.from(migratedBeam.simply_supported.thickness_mm), [8.8, 8.9]);
+assert.deepEqual(Array.from(migratedBeam.simply_supported.angle_arm_mm), [149.5]);
+assert.deepEqual(Array.from(migratedBeam.simply_supported.curve_points[0].deflection_mm), [-0.41]);
+assert.deepEqual(Array.from(migratedBeam.cantilever.thickness_mm), [6.9]);
+assert.equal("height_mm" in migratedBeam.simply_supported, false);
 
 console.log(`CSV round-trip OK: ${parsed.length} records`);

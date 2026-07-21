@@ -11,6 +11,7 @@ import mimetypes
 import os
 import re
 import sys
+from decimal import Decimal, ROUND_HALF_UP
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -538,6 +539,20 @@ def report_number(value, digits: int = 3) -> str:
         return "—"
     text = f"{number:.{digits}f}"
     return text.rstrip("0").rstrip(".") if "." in text else text
+
+
+def report_number_half_up(value, digits: int = 3, fixed: bool = False) -> str:
+    if value is None:
+        return "—"
+    number = float(value)
+    if not math.isfinite(number):
+        return "—"
+    quantum = Decimal("1").scaleb(-digits)
+    rounded = Decimal(str(number)).quantize(quantum, rounding=ROUND_HALF_UP)
+    if rounded == 0:
+        rounded = abs(rounded)
+    text = f"{rounded:.{digits}f}"
+    return text if fixed else text.rstrip("0").rstrip(".")
 
 
 def report_value(value) -> str:
@@ -1440,96 +1455,304 @@ def bending_report_block(data: dict, result: dict) -> str:
     ])
 
 
+def beam_measurement_values(value) -> list:
+    if isinstance(value, list):
+        return [item for item in value if item not in (None, "")]
+    return [] if value in (None, "") else [value]
+
+
+def padded_report_values(
+    values: list,
+    count: int,
+    digits: int = 3,
+    scale: float = 1.0,
+    fixed: bool = False,
+) -> list[str]:
+    formatted = [report_number_half_up(float(value) * scale, digits, fixed=fixed) for value in values]
+    return [*formatted, *(["—"] * (count - len(formatted)))]
+
+
+def scientific_parts(value: float) -> tuple[float, int]:
+    if value == 0:
+        return 0.0, 0
+    exponent = int(math.floor(math.log10(abs(value))))
+    return value / (10 ** exponent), exponent
+
+
+def beam_deflection_curve_chart(simple: dict) -> str:
+    length = float(simple["length_mm"])
+    measured = simple.get("curve_points", [])
+    points_by_x: dict[float, tuple[float, float, bool]] = {0.0: (0.0, 0.0, False), length: (length, 0.0, False)}
+    for point in measured:
+        x = float(point["x_mm"])
+        y = float(point["deflection_mm"])
+        points_by_x[round(x, 9)] = (x, y, True)
+        mirror = length - x
+        if 0 <= mirror <= length and not any(abs(existing[0] - mirror) < 1e-7 for existing in points_by_x.values()):
+            points_by_x[round(mirror, 9)] = (mirror, y, False)
+    ordered = sorted(points_by_x.values(), key=lambda item: item[0])
+    y_values = [item[1] for item in ordered]
+    y_min = min([0.0, *y_values])
+    y_max = max([0.0, *y_values])
+    if math.isclose(y_min, y_max):
+        y_min -= 1.0
+        y_max += 1.0
+    padding = (y_max - y_min) * 0.08
+    y_min -= padding
+    y_max += padding
+    width, height = 760, 440
+    left, right, top, bottom = 86, 724, 58, 370
+
+    def x_position(value: float) -> float:
+        return left + (value / length) * (right - left) if length else left
+
+    def y_position(value: float) -> float:
+        return top + (y_max - value) / (y_max - y_min) * (bottom - top)
+
+    svg = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" role="img" aria-labelledby="title desc">',
+        '<title id="title">简支梁挠曲线</title>',
+        '<desc id="desc">根据各测点重复挠度的平均值绘制，并按跨中加载的对称性补全另一半曲线。</desc>',
+        f'<rect width="{width}" height="{height}" fill="#ffffff"/>',
+        '<text x="380" y="30" text-anchor="middle" font-family="Microsoft YaHei, SimSun, sans-serif" font-size="19" font-weight="700" fill="#172033">简支梁挠曲线</text>',
+    ]
+    for index in range(6):
+        x_value = length * index / 5.0
+        x = x_position(x_value)
+        svg.extend([
+            f'<line x1="{x:.2f}" y1="{top}" x2="{x:.2f}" y2="{bottom}" stroke="#dce4e8" stroke-width="1"/>',
+            f'<text x="{x:.2f}" y="394" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#354052">{report_number(x_value, 1)}</text>',
+        ])
+    for index in range(6):
+        y_value = y_min + (y_max - y_min) * index / 5.0
+        y = y_position(y_value)
+        svg.extend([
+            f'<line x1="{left}" y1="{y:.2f}" x2="{right}" y2="{y:.2f}" stroke="#dce4e8" stroke-width="1"/>',
+            f'<text x="{left - 12}" y="{y + 4:.2f}" text-anchor="end" font-family="Arial, sans-serif" font-size="12" fill="#354052">{report_number(y_value, 2)}</text>',
+        ])
+    svg.extend([
+        f'<line x1="{left}" y1="{y_position(0):.2f}" x2="{right}" y2="{y_position(0):.2f}" stroke="#172033" stroke-width="2"/>',
+        f'<line x1="{left}" y1="{top}" x2="{left}" y2="{bottom}" stroke="#172033" stroke-width="2"/>',
+        '<text x="405" y="428" text-anchor="middle" font-family="Microsoft YaHei, SimSun, sans-serif" font-size="14" fill="#172033">位置 x / mm</text>',
+        '<text x="24" y="214" text-anchor="middle" transform="rotate(-90 24 214)" font-family="Microsoft YaHei, SimSun, sans-serif" font-size="14" fill="#172033">挠度 W / mm</text>',
+        '<polyline points="' + " ".join(f'{x_position(x):.2f},{y_position(y):.2f}' for x, y, _ in ordered) + '" fill="none" stroke="#0f766e" stroke-width="3"/>',
+    ])
+    for x, y, directly_measured in ordered:
+        if directly_measured:
+            svg.append(
+                f'<circle cx="{x_position(x):.2f}" cy="{y_position(y):.2f}" r="5.5" fill="#d97706" stroke="#ffffff" stroke-width="2">'
+                f'<title>x={report_number(x, 3)} mm，平均挠度={report_number(y, 4)} mm</title></circle>'
+            )
+    svg.append('</svg>')
+    encoded = base64.b64encode("".join(svg).encode("utf-8")).decode("ascii")
+    return f"data:image/svg+xml;base64,{encoded}"
+
+
 def deformation_report_blocks(data: dict, result: dict) -> dict[str, str]:
+    simple_input = data["simply_supported"]
+    cantilever_input = data["cantilever"]
     simple = result["simply_supported"]
     cantilever = result["cantilever"]
-    cantilever_input = data["cantilever"]
-    curve_rows = [[row.get("x_mm"), row.get("deflection_mm")] for row in data["simply_supported"].get("curve_points", [])]
+
+    length_values = beam_measurement_values(simple_input["length_mm"])
+    simple_width_values = beam_measurement_values(simple_input["width_mm"])
+    simple_thickness_values = beam_measurement_values(
+        simple_input.get("thickness_mm", simple_input.get("height_mm"))
+    )
+    angle_arm_values = beam_measurement_values(simple_input["angle_arm_mm"])
+    dimension_count = max(
+        len(length_values), len(simple_width_values), len(simple_thickness_values), len(angle_arm_values), 1
+    )
+    inertia_m4 = simple["Iz_mm4"] * 1e-12
+    inertia_coefficient, inertia_exponent = scientific_parts(inertia_m4)
+
+    central_values = beam_measurement_values(simple_input["central_deflection_mm"])
+    angle_delta_values = beam_measurement_values(simple_input["angle_indicator_delta_mm"])
+    deformation_count = max(len(central_values), len(angle_delta_values), 1)
+    deformation_rows = [
+        ["$\\Delta W$", *padded_report_values(central_values, deformation_count, fixed=True), report_number_half_up(simple["deflection_experimental_mm"], 3, fixed=True)],
+        ["$\\delta$", *padded_report_values(angle_delta_values, deformation_count, fixed=True), report_number_half_up(simple["angle_indicator_delta_mm"], 3, fixed=True)],
+    ]
+
+    reciprocity_12_values = beam_measurement_values(simple_input["reciprocity_12_mm"])
+    reciprocity_21_values = beam_measurement_values(simple_input["reciprocity_21_mm"])
+    reciprocity_count = max(len(reciprocity_12_values), len(reciprocity_21_values), 1)
+    reciprocity_difference = abs(simple["reciprocity_difference_mm"])
+    reciprocity_ok = reciprocity_difference < 0.01 or math.isclose(reciprocity_difference, 0.01, abs_tol=1e-12)
+    reciprocity_conclusion = (
+        "在误差范围内，$\\Delta\\bar W_{12}=\\Delta\\bar W_{21}$。"
+        if reciprocity_ok else
+        "两次互换测量的位移差超过 $0.01\\ \\mathrm{mm}$，本组数据未能验证位移互等定理。"
+    )
+
+    curve_points = simple.get("curve_points", [])
+    curve_repeat_count = max([len(point["deflection_readings_mm"]) for point in curve_points] or [1])
+    curve_rows = []
+    for repeat_index in range(curve_repeat_count):
+        curve_rows.append([
+            repeat_index + 1,
+            *[
+                report_number_half_up(point["deflection_readings_mm"][repeat_index], 3, fixed=True)
+                if repeat_index < len(point["deflection_readings_mm"]) else "—"
+                for point in curve_points
+            ],
+        ])
+    curve_rows.append(["平均", *[report_number_half_up(point["deflection_mm"], 3, fixed=True) for point in curve_points]])
+    curve_headers = [
+        "次数",
+        *[
+            f"$x_{index + 1}={report_number(point['x_mm'] / 10.0, 2)}\\ \\mathrm{{cm}}$ 处 $\\Delta W$/mm"
+            for index, point in enumerate(curve_points)
+        ],
+    ]
+    curve_position_text = "，".join(
+        f"$x_{index + 1}={report_number(point['x_mm'] / 10.0, 2)}\\ \\mathrm{{cm}}$"
+        for index, point in enumerate(curve_points)
+    )
+    curve_chart = beam_deflection_curve_chart(simple) if curve_points else ""
+
     simple_block = "\n\n".join([
         "## 五、实验结果处理",
         "### 1. 原始尺寸",
-        (
-            f"简支梁平均尺寸：$L={report_number(simple['length_mm'], 2)}\\ \\mathrm{{mm}}$、"
-            f"$b={report_number(simple['width_mm'], 2)}\\ \\mathrm{{mm}}$、"
-            f"$h={report_number(simple['height_mm'], 2)}\\ \\mathrm{{mm}}$。"
-        ),
-        "### 2. 最大挠度和支点转角",
-        (
-            f"跨中挠度实验值为 {report_number(simple['deflection_experimental_mm'], 4)} mm，"
-            f"理论值为 {report_number(simple['deflection_theoretical_mm'], 4)} mm，误差为 "
-            f"{report_number(simple['deflection_error_pct'], 2)}%。支点转角实验值为 "
-            f"{report_number(simple['theta_experimental_rad'], 6)} rad，理论值为 "
-            f"{report_number(simple['theta_theoretical_rad'], 6)} rad。"
-        ),
-        "### 3. 验证位移互等定理",
-        (
-            f"$\\Delta W_{{12}}={report_number(simple['reciprocity_12_mm'], 4)}\\ \\mathrm{{mm}}$，"
-            f"$\\Delta W_{{21}}={report_number(simple['reciprocity_21_mm'], 4)}\\ \\mathrm{{mm}}$，"
-            f"差值为 {report_number(simple['reciprocity_difference_mm'], 4)} mm。"
-        ),
-        "### 4. 挠曲线",
-        markdown_table(["位置 $x$/mm", "挠度/mm"], curve_rows),
-    ])
-    width_values = cantilever_input["width_mm"] if isinstance(cantilever_input["width_mm"], list) else [cantilever_input["width_mm"]]
-    height_values = cantilever_input["height_mm"] if isinstance(cantilever_input["height_mm"], list) else [cantilever_input["height_mm"]]
-    dimension_count = max(len(width_values), len(height_values))
-    width_values = [*width_values, *([""] * (dimension_count - len(width_values)))]
-    height_values = [*height_values, *([""] * (dimension_count - len(height_values)))]
-    repeat_headers = [str(index + 1) for index in range(len(cantilever["raw_strain_readings_micro"]))]
-    strain_rows = [
-        [
-            "第 1 组 $\\varepsilon_1$",
-            *[report_number(value, 3) for value in cantilever["strain_group_1_micro"]],
-            report_number(cantilever["mean_strain_group_1_micro"], 3),
-        ],
-        [
-            "第 2 组 $\\varepsilon_2$",
-            *[report_number(value, 3) for value in cantilever["strain_group_2_micro"]],
-            report_number(cantilever["mean_strain_group_2_micro"], 3),
-        ],
-        [
-            "$\\Delta\\varepsilon=\\varepsilon_1-\\varepsilon_2$",
-            *[report_number(value, 3) for value in cantilever["strain_differences_micro"]],
-            report_number(cantilever["strain_difference_micro"], 3),
-        ],
-    ]
-    wz_m3 = cantilever["Wz_mm3"] * 1e-9
-    wz_exponent = int(math.floor(math.log10(abs(wz_m3))))
-    wz_coefficient = wz_m3 / (10 ** wz_exponent)
-    cantilever_block = "\n\n".join([
-        "## 五、实验数据处理",
-        "### 1. 原始数据",
-        "试件尺寸：",
         markdown_table(
-            ["尺寸/mm", *[str(index + 1) for index in range(dimension_count)], "平均"],
+            ["尺寸", *[str(index + 1) for index in range(dimension_count)], "平均"],
             [
-                ["$b$", *[report_number(value, 3) if value != "" else "—" for value in width_values], report_number(cantilever["width_mm"], 3)],
-                ["$h$", *[report_number(value, 3) if value != "" else "—" for value in height_values], report_number(cantilever["height_mm"], 3)],
+                ["$L$/cm", *padded_report_values(length_values, dimension_count, 2, 0.1, fixed=True), report_number_half_up(simple["length_mm"] / 10.0, 2, fixed=True)],
+                ["宽度 $b$/mm", *padded_report_values(simple_width_values, dimension_count, 2, fixed=True), report_number_half_up(simple["width_mm"], 2, fixed=True)],
+                ["厚度 $h$/mm", *padded_report_values(simple_thickness_values, dimension_count, 2, fixed=True), report_number_half_up(simple["thickness_mm"], 2, fixed=True)],
+                ["转角测量臂长 $a$/mm", *padded_report_values(angle_arm_values, dimension_count, 1, fixed=True), report_number_half_up(simple["angle_arm_mm"], 1, fixed=True)],
             ],
         ),
         (
-            f"两加载位置间距 $l_{{12}}={report_number(cantilever['position_spacing_mm'], 3)}\\ \\mathrm{{mm}}$。"
+            "$$\n"
+            "\\begin{aligned}\n"
+            "I&=\\frac{\\bar b\\bar h^3}{12}\\\\\n"
+            f"&=\\frac{{({report_number(simple['width_mm'], 3)}\\times10^{{-3}})"
+            f"({report_number(simple['thickness_mm'], 3)}\\times10^{{-3}})^3}}{{12}}\\\\\n"
+            f"&={report_number(inertia_coefficient, 4)}\\times10^{{{inertia_exponent}}}\\ \\mathrm{{m^4}}。\n"
+            "\\end{aligned}\n"
+            "$$"
         ),
+        "---",
+        "### 2. 最大挠度和支点转角",
+        "跨中挠度和转角百分表位移的原始测量值如下；各项均先取平均值再参与计算，臂长采用原始尺寸表中的平均值 $\\bar a$。",
+        markdown_table(["测量项/mm", *[str(index + 1) for index in range(deformation_count)], "平均"], deformation_rows),
+        "实测挠度：",
+        (
+            "$$\n"
+            f"W_{{\\mathrm{{测}}}}=\\Delta\\bar W={report_number_half_up(simple['deflection_experimental_mm'], 3, fixed=True)}\\ \\mathrm{{mm}}。\n"
+            "$$"
+        ),
+        "理论挠度：",
+        (
+            "$$\n"
+            "\\begin{aligned}\n"
+            "W_{\\mathrm{理论}}&=\\frac{\\Delta P L^3}{48EI}\\\\\n"
+            f"&=\\frac{{{report_number(simple['delta_load_N'], 3)}\\times({report_number(simple['length_mm'] / 1000.0, 4)})^3}}"
+            f"{{48\\times{report_number(simple['E_MPa'] / 1000.0, 3)}\\times10^9"
+            f"\\times{report_number(inertia_coefficient, 4)}\\times10^{{{inertia_exponent}}}}}\\\\\n"
+            f"&={report_number(simple['deflection_theoretical_mm'], 4)}\\ \\mathrm{{mm}}。\n"
+            "\\end{aligned}\n"
+            "$$"
+        ),
+        "相对误差：",
+        (
+            "$$\n"
+            "\\eta_W=\\left|\\frac{W_{\\mathrm{理论}}-W_{\\mathrm{测}}}{W_{\\mathrm{理论}}}\\right|\\times100\\%"
+            f"={report_number(simple['deflection_error_pct'], 2)}\\%。\n"
+            "$$"
+        ),
+        (
+            f"臂长的平均值为 $\\bar a={report_number_half_up(simple['angle_arm_mm'], 1, fixed=True)}\\ \\mathrm{{mm}}$。"
+        ),
+        (
+            "$$\n"
+            "\\theta_{\\mathrm{测}}\\approx\\tan\\theta=\\frac{\\bar\\delta}{\\bar a}"
+            f"=\\frac{{{report_number(simple['angle_indicator_delta_mm'], 3)}}}"
+            f"{{{report_number_half_up(simple['angle_arm_mm'], 1, fixed=True)}}}"
+            f"={report_number(simple['theta_experimental_rad'], 6)}\\ \\mathrm{{rad}}。\n"
+            "$$"
+        ),
+        (
+            "$$\n"
+            "\\theta_{\\mathrm{理论}}=\\frac{\\Delta P L^2}{16EI}"
+            f"={report_number(simple['theta_theoretical_rad'], 6)}\\ \\mathrm{{rad}}。\n"
+            "$$"
+        ),
+        (
+            "$$\n"
+            "\\eta_\\theta=\\left|\\frac{\\theta_{\\mathrm{理论}}-\\theta_{\\mathrm{测}}}{\\theta_{\\mathrm{理论}}}\\right|\\times100\\%"
+            f"={report_number(simple['theta_error_pct'], 2)}\\%。\n"
+            "$$"
+        ),
+        "### 3. 验证位移互等定理",
+        markdown_table(
+            ["测量项/mm", *[str(index + 1) for index in range(reciprocity_count)], "平均"],
+            [
+                ["$\\Delta W_{12}$", *padded_report_values(reciprocity_12_values, reciprocity_count, fixed=True), report_number_half_up(simple["reciprocity_12_mm"], 4)],
+                ["$\\Delta W_{21}$", *padded_report_values(reciprocity_21_values, reciprocity_count, fixed=True), report_number_half_up(simple["reciprocity_21_mm"], 4)],
+            ],
+        ),
+        (
+            "$$\n"
+            "\\left|\\Delta\\bar W_{12}-\\Delta\\bar W_{21}\\right|"
+            f"={report_number(reciprocity_difference, 4)}\\ \\mathrm{{mm}}。\n"
+            "$$"
+        ),
+        reciprocity_conclusion,
+        "### 4. 挠曲线",
+        f"测点位置：{curve_position_text}。" if curve_position_text else "未输入挠曲线测点。",
+        markdown_table(curve_headers, curve_rows) if curve_points else "",
+        "根据各测点的平均挠度，并利用跨中加载时挠曲线关于跨中对称的性质绘制挠曲线：" if curve_chart else "",
+        f"![简支梁挠曲线]({curve_chart})" if curve_chart else "",
+        "---",
+    ])
+
+    cantilever_width_values = beam_measurement_values(cantilever_input["width_mm"])
+    cantilever_thickness_values = beam_measurement_values(
+        cantilever_input.get("thickness_mm", cantilever_input.get("height_mm"))
+    )
+    cantilever_dimension_count = max(len(cantilever_width_values), len(cantilever_thickness_values), 1)
+    repeat_headers = [str(index + 1) for index in range(len(cantilever["raw_strain_readings_micro"]))]
+    strain_rows = [
+        ["第 1 组 $\\varepsilon_1$", *[report_number(value, 3) for value in cantilever["strain_group_1_micro"]], report_number(cantilever["mean_strain_group_1_micro"], 3)],
+        ["第 2 组 $\\varepsilon_2$", *[report_number(value, 3) for value in cantilever["strain_group_2_micro"]], report_number(cantilever["mean_strain_group_2_micro"], 3)],
+        ["$\\Delta\\varepsilon=\\varepsilon_1-\\varepsilon_2$", *[report_number(value, 3) for value in cantilever["strain_differences_micro"]], report_number(cantilever["strain_difference_micro"], 3)],
+    ]
+    wz_m3 = cantilever["Wz_mm3"] * 1e-9
+    wz_coefficient, wz_exponent = scientific_parts(wz_m3)
+    cantilever_block = "\n\n".join([
+        "## 五、实验数据处理",
+        "### 1. 原始数据",
+        markdown_table(
+            ["尺寸/mm", *[str(index + 1) for index in range(cantilever_dimension_count)], "平均"],
+            [
+                ["宽度 $b$", *padded_report_values(cantilever_width_values, cantilever_dimension_count, 2, fixed=True), report_number_half_up(cantilever["width_mm"], 2, fixed=True)],
+                ["厚度 $h$", *padded_report_values(cantilever_thickness_values, cantilever_dimension_count, 2, fixed=True), report_number_half_up(cantilever["thickness_mm"], 2, fixed=True)],
+            ],
+        ),
+        f"两加载位置间距 $l_{{12}}={report_number(cantilever['position_spacing_mm'] / 10.0, 3)}\\ \\mathrm{{cm}}$。",
         (
             "$$\n"
             "\\begin{aligned}\n"
             "W_z&=\\frac{\\bar b\\bar h^2}{6}\\\\\n"
             f"&={report_number(cantilever['Wz_mm3'], 3)}\\ \\mathrm{{mm^3}}"
-            f"={report_number(wz_coefficient, 4)}\\times10^{{{wz_exponent}}}\\ \\mathrm{{m^3}}.\n"
+            f"={report_number(wz_coefficient, 4)}\\times10^{{{wz_exponent}}}\\ \\mathrm{{m^3}}。\n"
             "\\end{aligned}\n"
             "$$"
         ),
-        "以下两组均为直接输入的原始应变读数，差值由程序在数据处理过程中计算，单位为 $10^{-6}$。",
+        "两加载位置的原始应变数据如下，单位为 $10^{-6}$。先分别求两组平均值，再在数据处理过程中作差。",
         markdown_table(["测量项", *repeat_headers, "平均"], strain_rows),
+        "---",
+        "金属块质量：",
         (
             "$$\n"
             "\\Delta\\bar\\varepsilon=\\bar\\varepsilon_1-\\bar\\varepsilon_2"
             f"=({report_number(cantilever['mean_strain_group_1_micro'], 3)}"
             f"-{report_number(cantilever['mean_strain_group_2_micro'], 3)})\\times10^{{-6}}"
-            f"={report_number(cantilever['strain_difference_micro'], 3)}\\times10^{{-6}}.\n"
+            f"={report_number(cantilever['strain_difference_micro'], 3)}\\times10^{{-6}}。\n"
             "$$"
         ),
-        "金属块质量：",
         (
             "$$\n"
             "\\begin{aligned}\n"
@@ -1539,15 +1762,9 @@ def deformation_report_blocks(data: dict, result: dict) -> dict[str, str]:
             f"\\times{report_number(wz_coefficient, 4)}\\times10^{{{wz_exponent}}}}}"
             f"{{({report_number(cantilever['position_spacing_mm'] / 1000.0, 4)})"
             f"\\times{report_number(cantilever['gravity_m_s2'], 3)}}}\\\\\n"
-            f"&={report_number(cantilever['mass_kg'], 4)}\\ \\mathrm{{kg}}.\n"
+            f"&={report_number(cantilever['mass_kg'], 4)}\\ \\mathrm{{kg}}。\n"
             "\\end{aligned}\n"
             "$$"
-        ),
-        "## 六、实验结论",
-        (
-            f"简支梁挠度误差为 {report_number(simple['deflection_error_pct'], 2)}%，"
-            f"转角误差为 {report_number(simple['theta_error_pct'], 2)}%，位移互等定理在仪器分辨率范围内成立；"
-            f"悬臂梁实验测得金属块质量为 {report_number(cantilever['mass_kg'], 4)} kg。"
         ),
     ])
     return {"simple": simple_block, "cantilever": cantilever_block}
@@ -1711,7 +1928,7 @@ def ensure_source_images(report: str, source: str) -> str:
             missing_blocks.append(block.strip())
     if not missing_blocks:
         return report
-    thought = re.search(r"^## [七八]、思考题", report, flags=re.MULTILINE)
+    thought = re.search(r"^## [六七八]、思考题", report, flags=re.MULTILINE)
     insert_at = thought.start() if thought else len(report)
     addition = "\n\n".join(missing_blocks)
     return report[:insert_at].rstrip() + "\n\n" + addition + "\n\n" + report[insert_at:].lstrip()
@@ -1784,7 +2001,10 @@ def merge_report_markdown(exp: dict, data: dict, result: dict, metadata: dict) -
         simple_start = source.index("## 五、实验结果处理")
         cantilever_start = source.index("# 悬臂梁实验", simple_start)
         cantilever_data_start = source.index("## 五、实验数据处理", cantilever_start)
-        thought_start = source.index("## 七、思考题", cantilever_data_start)
+        thought_match = re.search(r"^## [六七]、思考题", source[cantilever_data_start:], flags=re.MULTILINE)
+        if thought_match is None:
+            raise ValueError(f"{exp['report_file']} 中找不到思考题边界")
+        thought_start = cantilever_data_start + thought_match.start()
         merged = (
             source[:simple_start].rstrip() + "\n\n" + blocks["simple"] + "\n\n" +
             source[cantilever_start:cantilever_data_start].rstrip() + "\n\n" +

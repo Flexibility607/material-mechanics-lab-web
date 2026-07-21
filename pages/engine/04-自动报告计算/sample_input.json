@@ -143,23 +143,23 @@
         "E_GPa": 210.0,
         "length_mm": [700.0, 699.8, 699.5],
         "width_mm": [19.95, 19.99, 19.91],
-        "height_mm": [8.94, 8.97, 8.98],
+        "thickness_mm": [8.94, 8.97, 8.98],
         "delta_load_N": 19.6,
         "central_deflection_mm": [0.556, 0.566, 0.56, 0.556],
         "angle_indicator_delta_mm": [0.367, 0.357, 0.36, 0.36],
-        "angle_arm_mm": 150.0,
+        "angle_arm_mm": [150.0, 150.0, 150.0],
         "reciprocity_12_mm": [0.381, 0.38, 0.381, 0.38],
         "reciprocity_21_mm": [0.378, 0.38, 0.38, 0.379],
         "curve_points": [
-          {"x_mm": 168.0, "deflection_mm": -0.381},
-          {"x_mm": 244.0, "deflection_mm": -0.503},
-          {"x_mm": 344.9, "deflection_mm": -0.56}
+          {"x_mm": 168.0, "deflection_mm": [-0.381, -0.383, -0.381, -0.379]},
+          {"x_mm": 244.0, "deflection_mm": [-0.502, -0.5, -0.505, -0.503]},
+          {"x_mm": 344.9, "deflection_mm": [-0.556, -0.566, -0.56, -0.556]}
         ]
       },
       "cantilever": {
         "E_GPa": 210.0,
         "width_mm": [14.0, 14.01, 14.02],
-        "height_mm": [7.06, 7.05, 7.0],
+        "thickness_mm": [7.06, 7.05, 7.0],
         "position_spacing_mm": 300.0,
         "strain_readings_micro": [
           [151, 66],
