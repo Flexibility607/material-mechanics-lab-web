@@ -4,6 +4,8 @@
     window.MATERIAL_MECHANICS_STATIC_PAGES = true;
 
     const nativeFetch = window.fetch.bind(window);
+    const staticApiUrl = new URL(document.currentScript?.src || document.baseURI, document.baseURI);
+    const engineVersion = staticApiUrl.searchParams.get("v") || String(Date.now());
     const engineFiles = [
         "material_mechanics_assistant/backend/server.py",
         "04-自动报告计算/lab_report_calculator.py",
@@ -43,7 +45,8 @@
 
     async function loadText(relativePath) {
         const url = new URL(`engine/${relativePath}`, document.baseURI);
-        const response = await nativeFetch(url);
+        url.searchParams.set("v", engineVersion);
+        const response = await nativeFetch(url, { cache: "no-store" });
         if (!response.ok) throw new Error(`无法载入计算资源：${relativePath}`);
         return response.text();
     }
@@ -76,7 +79,12 @@ _spec.loader.exec_module(_pages_server)
 `);
             return pyodide;
         })();
-        return enginePromise;
+        try {
+            return await enginePromise;
+        } catch (error) {
+            enginePromise = null;
+            throw error;
+        }
     }
 
     async function catalogResponse() {
