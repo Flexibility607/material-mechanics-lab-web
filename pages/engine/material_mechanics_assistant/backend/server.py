@@ -1689,14 +1689,14 @@ def deformation_report_blocks(data: dict, result: dict) -> dict[str, str]:
         markdown_table(
             ["测量项/mm", *[str(index + 1) for index in range(reciprocity_count)], "平均"],
             [
-                ["$\\Delta W_{12}$", *padded_report_values(reciprocity_12_values, reciprocity_count, fixed=True), report_number_half_up(simple["reciprocity_12_mm"], 4)],
-                ["$\\Delta W_{21}$", *padded_report_values(reciprocity_21_values, reciprocity_count, fixed=True), report_number_half_up(simple["reciprocity_21_mm"], 4)],
+                ["$\\Delta W_{12}$", *padded_report_values(reciprocity_12_values, reciprocity_count, fixed=True), report_number_half_up(simple["reciprocity_12_mm"], 5)],
+                ["$\\Delta W_{21}$", *padded_report_values(reciprocity_21_values, reciprocity_count, fixed=True), report_number_half_up(simple["reciprocity_21_mm"], 5)],
             ],
         ),
         (
             "$$\n"
             "\\left|\\Delta\\bar W_{12}-\\Delta\\bar W_{21}\\right|"
-            f"={report_number(reciprocity_difference, 4)}\\ \\mathrm{{mm}}。\n"
+            f"={report_number_half_up(reciprocity_difference, 5)}\\ \\mathrm{{mm}}。\n"
             "$$"
         ),
         reciprocity_conclusion,
@@ -1959,6 +1959,16 @@ def correct_reference_sample_report(exp: dict, source: str, result: dict) -> str
             source[:hooke_start].rstrip() + "\n\n" + elastic_hooke_section(result) + "\n\n" +
             source[conclusion_start:].lstrip()
         )
+    if exp["id"] == "B061":
+        simple = result["simply_supported"]
+        original_row = "| $\\Delta W_{21}$ | 0.378 | 0.380 | 0.380 | 0.379 | 0.379 |"
+        corrected_row = (
+            "| $\\Delta W_{21}$ | 0.378 | 0.380 | 0.380 | 0.379 | "
+            f"{report_number_half_up(simple['reciprocity_21_mm'], 5)} |"
+        )
+        if original_row not in source:
+            raise ValueError("梁变形扫描算例的位移互等表结构已变化，无法安全校正")
+        return source.replace(original_row, corrected_row)
     if exp["id"] != "B071":
         return source
 

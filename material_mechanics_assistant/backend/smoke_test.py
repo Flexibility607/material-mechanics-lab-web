@@ -98,6 +98,8 @@ def main():
                 "| 第 1 组 $\\varepsilon_1$ | 151 | 151 | 152 | 151 | 151.25 |",
                 "| 第 2 组 $\\varepsilon_2$ | 66 | 65 | 65 | 64 | 65 |",
                 "| $\\Delta\\varepsilon=\\varepsilon_1-\\varepsilon_2$ | 85 | 86 | 87 | 87 | 86.25 |",
+                "| $\\Delta W_{12}$ | 0.381 | 0.380 | 0.381 | 0.380 | 0.3805 |",
+                "| $\\Delta W_{21}$ | 0.378 | 0.380 | 0.380 | 0.379 | 0.37925 |",
                 "\\Delta\\bar\\varepsilon",
                 "=\\bar\\varepsilon_1-\\bar\\varepsilon_2",
             ):
@@ -118,6 +120,7 @@ def main():
                 "| 1 | -0.400 | -0.502 | -0.556 |",
                 "| 平均 | -0.386 | -0.503 | -0.560 |",
                 "![简支梁挠曲线](data:image/svg+xml;base64,",
+                "=0.00125\\ \\mathrm{mm}",
                 "两加载位置的原始应变数据如下",
                 "| 第 1 组 $\\varepsilon_1$ | 150 | 151 | 152 | 151 | 151 |",
                 "| $\\Delta\\varepsilon=\\varepsilon_1-\\varepsilon_2$ | 84 | 86 | 87 | 87 | 86 |",

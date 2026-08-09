@@ -77,6 +77,9 @@ class CalculatorRegressionTest(unittest.TestCase):
         self.assertAlmostEqual(deformation["simply_supported"]["deflection_theoretical_mm"], 0.5565, places=3)
         self.assertAlmostEqual(deformation["simply_supported"]["thickness_mm"], 8.9633, places=3)
         self.assertAlmostEqual(deformation["simply_supported"]["angle_arm_mm"], 150.0, places=3)
+        self.assertAlmostEqual(deformation["simply_supported"]["reciprocity_12_mm"], 0.3805, places=5)
+        self.assertAlmostEqual(deformation["simply_supported"]["reciprocity_21_mm"], 0.37925, places=5)
+        self.assertAlmostEqual(deformation["simply_supported"]["reciprocity_difference_mm"], 0.00125, places=5)
         self.assertEqual(
             deformation["simply_supported"]["curve_points"][0]["deflection_readings_mm"],
             [-0.381, -0.383, -0.381, -0.379],

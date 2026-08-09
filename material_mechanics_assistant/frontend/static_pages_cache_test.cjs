@@ -6,7 +6,7 @@ const vm = require("node:vm");
 const repoRoot = path.resolve(__dirname, "..", "..");
 const staticApiPath = path.join(repoRoot, "pages", "static_api.js");
 const staticApiSource = fs.readFileSync(staticApiPath, "utf8");
-const releaseVersion = "20260722-b061-engine-cache";
+const releaseVersion = "20260722-b061-reciprocity-mean";
 const requests = [];
 let loadPyodideAttempts = 0;
 
